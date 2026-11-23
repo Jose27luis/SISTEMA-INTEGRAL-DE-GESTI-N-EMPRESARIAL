@@ -83,29 +83,25 @@ export function FormularioRol({ permisos, rol, protegido, accion }: PropiedadesF
         </div>
       </div>
 
-      {protegido ? (
-        <>
-          <input type="hidden" name="exigeMfa" value="on" />
-          {permisos.map((permiso) => (
+      {protegido
+        ? permisos.map((permiso) => (
             <input key={permiso.id} type="hidden" name="permisoIds" value={permiso.id} />
-          ))}
-        </>
-      ) : null}
+          ))
+        : null}
 
       <Casilla
         id="exigeMfa"
-        name={protegido ? undefined : 'exigeMfa'}
+        name="exigeMfa"
         etiqueta="Exigir verificación en dos pasos"
         descripcion="Los usuarios con este rol deberán configurarla antes de usar el sistema."
         defaultChecked={rol?.exigeMfa ?? false}
-        disabled={protegido}
       />
 
       <fieldset className="flex flex-col gap-5">
         <legend className="mb-1 text-base font-semibold text-marino">Permisos</legend>
         {protegido ? (
           <p className="text-sm text-apagado">
-            Gerencia General conserva siempre todos los permisos y la verificación en dos pasos.
+            Gerencia General conserva siempre todos los permisos.
           </p>
         ) : null}
         {estado.errores.permisoIds === undefined ? null : (
