@@ -14,6 +14,7 @@ interface PropiedadesFormularioConfirmacion {
   pedirMotivo?: boolean;
   ayudaMotivo?: string;
   consecuencia?: string;
+  children?: ReactNode;
 }
 
 export function FormularioConfirmacion({
@@ -24,6 +25,7 @@ export function FormularioConfirmacion({
   pedirMotivo = false,
   ayudaMotivo,
   consecuencia,
+  children,
 }: PropiedadesFormularioConfirmacion): ReactNode {
   const [estado, accionFormulario] = useActionState(accion, ESTADO_INICIAL);
   const id = useId();
@@ -31,6 +33,7 @@ export function FormularioConfirmacion({
   return (
     <form action={accionFormulario} className="flex flex-col gap-4">
       <MensajeFormulario estado={estado} />
+      {children}
       {pedirMotivo ? (
         <AreaTexto
           id={`${id}-motivo`}
