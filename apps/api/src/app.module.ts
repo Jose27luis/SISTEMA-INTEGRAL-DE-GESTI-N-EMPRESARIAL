@@ -6,7 +6,10 @@ import { GuardiaPermisos } from './modules/access-control/permission.guard';
 import { AuditoriaModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { GuardiaSesion } from './modules/auth/session.guard';
+import { CatalogosModule } from './modules/catalogs/catalogs.module';
+import { ClientesModule } from './modules/clients/clients.module';
 import { HealthModule } from './modules/health/health.module';
+import { PersonalModule } from './modules/staff/staff.module';
 import { UsuariosModule } from './modules/users/users.module';
 
 @Module({
@@ -17,6 +20,9 @@ import { UsuariosModule } from './modules/users/users.module';
     ControlAccesoModule,
     AuthModule,
     UsuariosModule,
+    CatalogosModule,
+    PersonalModule,
+    ClientesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GuardiaSesion },
