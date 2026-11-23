@@ -121,7 +121,7 @@ export async function solicitarApi<T extends z.ZodType>(
   return { ok: true, datos: datos.data };
 }
 
-export async function descargarDeApi(ruta: string): Promise<Response | null> {
+export async function descargarDeApi(ruta: string, senal?: AbortSignal): Promise<Response | null> {
   const token = await leerSesion();
 
   if (token === null) {
@@ -136,6 +136,7 @@ export async function descargarDeApi(ruta: string): Promise<Response | null> {
     const respuesta = await fetch(`${leerEntorno().API_INTERNAL_URL}${ruta}`, {
       headers: cabeceras,
       cache: 'no-store',
+      ...(senal === undefined ? {} : { signal: senal }),
     });
 
     return respuesta.ok ? respuesta : null;
