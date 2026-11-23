@@ -1,7 +1,17 @@
 'use client';
 
 import { cn } from '@sige/ui/cn';
-import { CircleUserRound, House, type LucideIcon, ScrollText, ShieldCheck, Users } from 'lucide-react';
+import {
+  Building2,
+  CircleUserRound,
+  House,
+  IdCard,
+  ListTree,
+  type LucideIcon,
+  ScrollText,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -10,8 +20,11 @@ import type { GrupoNavegacion, IconoNavegacion } from '@/lib/navigation';
 const ICONOS: Record<IconoNavegacion, LucideIcon> = {
   inicio: House,
   cuenta: CircleUserRound,
+  clientes: Building2,
+  personal: IdCard,
   usuarios: Users,
   roles: ShieldCheck,
+  catalogos: ListTree,
   auditoria: ScrollText,
 };
 
