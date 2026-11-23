@@ -3141,7 +3141,7 @@ Las pruebas de integración contra PostgreSQL y las e2e con Playwright (sección
 - RUC validado con el dígito verificador de SUNAT tanto en la web como en la API; una persona jurídica debe tener RUC.
 - Acceso a clientes: quien no tiene alcance global y no está asignado recibe 403 y el intento queda en la auditoría como `PERMISO_DENEGADO`; los listados y búsquedas solo devuelven clientes visibles.
 - El responsable de un cliente queda asignado automáticamente a su equipo; quien registra un cliente sin alcance global también queda asignado.
-- La baja de un trabajador (o la desactivación de su usuario) desactiva la cuenta, cierra sus sesiones y retira sus asignaciones a clientes, conservando todo su historial; la fecha de cese no puede ser anterior a la de incorporación. RF-PER-03 exige además reasignar sus tareas abiertas: se agrega cuando exista el módulo de tareas (Sprint 3).
+- La baja de un trabajador (o la desactivación de su usuario) desactiva la cuenta, cierra sus sesiones y retira sus asignaciones a clientes, conservando todo su historial; la fecha de cese no puede ser anterior a la de incorporación. La reasignación de sus tareas abiertas (RF-PER-03) se completó en el Sprint 3 (sección 12.10).
 - La ficha y la cuenta se mantienen sincronizadas: el nombre del usuario se actualiza con la ficha.
 - Importación: cada fila se valida por separado; las válidas se registran y las rechazadas se informan con el número de fila y los motivos (RUC inválido, documento repetido en el archivo o ya registrado, régimen inexistente, fecha inválida, correo inválido). La fecha de incorporación vacía toma la fecha de importación. Solo se aceptan archivos .xlsx reales (se verifica la firma del archivo).
 - Toda acción sobre un cliente, sus contactos y su equipo queda en su historial.
@@ -3162,10 +3162,121 @@ Las pruebas de integración contra PostgreSQL y las e2e con Playwright (sección
 
 | Requerimiento | Situación |
 |---|---|
-| RF-PER-03 Reasignar tareas abiertas en la baja | Se agrega con el módulo de tareas (Sprint 3). |
+| RF-PER-03 Reasignar tareas abiertas en la baja | Completado en el Sprint 3. |
 | RF-CLI-07 Pestañas Comercial, Operativa, Tareas, Documentos y Accesos del expediente | Se agregan con sus módulos (Sprints 3, 5, 6, 7 y 8). |
 | RF-CFG-01 Datos de la empresa y RF-CFG-03 Parámetros | Pendientes; los parámetros de sesión se configuran hoy por variables de entorno. |
 | Aviso de `pnpm audit` (moderado) | `exceljs` depende de `uuid` < 11 (GHSA-w5hq-g745-h8pq), que afecta solo a las funciones v3, v5 y v6 con buffer; ExcelJS usa `v4`, por lo que no aplica. Se revisa al actualizar ExcelJS. |
+
+### 12.10 Sprint 3: tareas, avances, evidencias y notificaciones
+
+**Modelo de datos** (migración `20261124150000_tareas_y_notificaciones`): `tareas`, `tareas_colaboradores`, `transiciones_tarea`, `avances`, `archivos`, `evidencias`, `comentarios_tarea`, `notificaciones` y `ejecuciones_proceso`. Restricciones en la base:
+
+- Porcentaje entre 0 y 100 y minutos no negativos, tanto en la tarea como en cada avance.
+- La fecha de inicio no puede ser posterior a la fecha límite, y el revisor debe ser distinto del responsable.
+- El tamaño de cada archivo debe ser positivo.
+- Un colaborador tiene una sola participación vigente por tarea.
+- La clave de deduplicación de las notificaciones es única.
+
+Los códigos `T-AAAA-NNNNNN` salen de la secuencia `tareas_codigo_seq`, así que no se repiten aunque dos personas creen tareas a la vez. Se siembran los permisos `tarea:ver` (los cinco roles) y `tarea:crear` (Gerencia, Contabilidad, Administración y Comercial). La auditoría suma las acciones `CAMBIAR_ESTADO` y `DESCARGAR`.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `GET /tareas?busqueda=&estado=&responsableId=&clienteId=&prioridad=&atrasadas=si&desde=&hasta=&pagina=&porPagina=` | `tarea:ver` | Solo tareas visibles; `estado` acepta un estado, `ABIERTAS` o `CERRADAS`. |
+| `GET /tareas/opciones` | `tarea:ver` | Usuarios activos y clientes visibles para los selectores. |
+| `GET /tareas/mi-trabajo` | `tarea:ver` | Tareas abiertas propias agrupadas en atrasadas, hoy, próximos 7 días y posteriores, más las pendientes de revisión. |
+| `GET /tareas/:id` | `tarea:ver` + visibilidad | Detalle con avances, evidencias, comentarios, historial de estados y acciones permitidas. |
+| `POST /tareas` · `PUT /tareas/:id` | `tarea:crear` | Alta y edición; la edición exige la `version` leída (control de concurrencia). |
+| `POST /tareas/:id/inicio` | Responsable o colaborador | Pendiente → En proceso. |
+| `POST /tareas/:id/avances` | Responsable o colaborador | `multipart/form-data` con el avance y hasta 10 archivos en el campo `evidencias`. |
+| `POST /tareas/:id/comentarios` | Visibilidad | Comentario con menciones a participantes. |
+| `GET /archivos/:id[?descarga=1]` | Visibilidad de la tarea | Vista previa (PDF e imágenes) o descarga; queda en la auditoría. |
+| `GET /notificaciones?pagina=` · `GET /notificaciones/resumen` | Sesión | Centro de notificaciones (30 por página) y contador con las 8 más recientes. |
+| `GET /notificaciones/eventos` | Sesión | Flujo SSE: evento `notificacion` al llegar una nueva y `latido` cada 25 s. |
+| `POST /notificaciones/lectura` · `POST /notificaciones/:id/lectura` | Sesión | Marcar todas o una como leída. |
+| `POST /usuarios/:id/desactivacion` · `POST /personal/:id/cese` | Como antes | Aceptan `reasignarAId`, obligatorio si la persona tiene tareas abiertas. |
+
+**Reglas implementadas**
+
+- **Visibilidad por alcance:**
+  - Global: ve todas las tareas.
+  - Asignado: ve las tareas en las que participa y las de sus clientes asignados.
+  - Propio: ve solo las tareas en las que participa (responsable, colaborador, revisor o quien la asignó).
+  - Un intento fuera del alcance devuelve 403 y queda como `PERMISO_DENEGADO`.
+- **Participantes:** si la tarea es de un cliente, el responsable, los colaboradores y el revisor deben tener alcance global o estar asignados a ese cliente (RF-TAR-02). Quien crea una tarea sin alcance global debe tener asignado el cliente.
+- **Reglas de la tarea:**
+  - Si requiere aprobación, exige revisor, y el revisor debe ser distinto del responsable.
+  - Si requiere evidencia, exige describir la evidencia esperada.
+  - La fecha límite no puede ser anterior a la de inicio.
+- **Edición:** solo quien asignó la tarea o Gerencia, y solo mientras esté abierta. Si otra persona la modificó mientras tanto, se responde 409 y se pide recargar. Los participantes reciben `TAREA_MODIFICADA`, y el nuevo responsable recibe `TAREA_REASIGNADA`.
+- **Estados:** el servidor valida cada cambio con la máquina de estados de `@sige/types` (`estadoTrasAccion`, con pruebas de todas las transiciones). Cada cambio queda en `transiciones_tarea` y en la auditoría.
+- **Avances:**
+  - Fecha y hora del servidor; cliente heredado de la tarea.
+  - Registrar el primer avance sobre una tarea Pendiente la pasa a En proceso.
+  - El porcentaje de la tarea es el del último avance y los minutos se acumulan.
+  - Un avance no se edita: las correcciones se registran como un avance nuevo que referencia al anterior.
+- **Evidencias:**
+  - Se valida la firma real del archivo, no solo la extensión. Se aceptan PDF, PNG, JPEG, WEBP, Word, Excel y PowerPoint, y se rechaza, por ejemplo, un ejecutable renombrado a `.pdf`.
+  - Se guardan en el volumen `archivos` (`/app/almacen/clientes/{cliente}/…` o `general/…`) con nombre aleatorio, permisos 0640 y su SHA-256.
+  - Se entregan con `nosniff`, `Content-Security-Policy: sandbox` y `no-store`.
+  - Límite por avance: 10 archivos y 24 MB en total, por debajo del `client_max_body_size 25m` del vhost.
+- **Comentarios:** solo se puede mencionar a participantes de la tarea, y cada mencionado recibe `MENCION`.
+- **Notificaciones:**
+  - Nunca se notifica a quien hizo la acción.
+  - Se publican por `pg_notify` en el canal `sige_notificaciones`. La API las reenvía por SSE a cada usuario, y la web las recibe en la ruta `/eventos`, que reenvía el flujo con `X-Accel-Buffering: no`.
+  - La campana del panel actualiza el contador sin recargar la página.
+- **Worker** (contenedor `worker`, misma imagen que la API, `node dist/worker.js`):
+  - Corre al iniciar y luego cada hora, en el minuto 5, hora de Lima.
+  - Toma `pg_try_advisory_xact_lock`: si hay dos workers, solo uno trabaja.
+  - Avisa `TAREA_POR_VENCER` al responsable cuando la tarea vence hoy o mañana.
+  - Avisa `TAREA_ATRASADA` al responsable y a quien la asignó.
+  - Las claves de deduplicación garantizan un aviso por tarea, usuario y día.
+  - Cada corrida queda en `ejecuciones_proceso`.
+- **Baja con reasignación (RF-PER-03):**
+  - Si la persona es responsable o revisora de tareas abiertas, la baja exige indicar quién las recibe; la ficha del personal y la del usuario muestran cuántas tiene.
+  - Quien las recibe debe atender a todos los clientes involucrados; si no, la API indica qué tareas lo impiden.
+  - Si el destino terminaría siendo su propio revisor, la revisión pasa a quien asignó la tarea; si tampoco es posible, la tarea queda sin revisor ni aprobación.
+  - Las colaboraciones del saliente se retiran.
+  - Todo ocurre en la misma transacción que la baja.
+
+**Pantallas web:**
+
+- Mi trabajo.
+- Tareas, con vistas lista (filtros y paginación), tablero por estado y calendario mensual por fecha límite.
+- Nueva tarea y Editar tarea.
+- Detalle de la tarea, con registro de avance y evidencias, línea de tiempo de avances con vista previa y descarga, comentarios con menciones e historial de estados.
+- Notificaciones.
+- La campana de notificaciones en el panel, en escritorio y en celular.
+
+El límite de las server actions subió a 25 MB para admitir las evidencias.
+
+**Verificación realizada:** typecheck, lint, 51 pruebas unitarias y build. Las pruebas nuevas cubren la máquina de estados, la detección de tipo de archivo, la regla del revisor en la reasignación y la clasificación y deduplicación de alertas. Contra un stack desechable con PostgreSQL real se probaron:
+
+- **Validaciones al crear:** se rechazan un responsable o un colaborador no asignado al cliente y un revisor igual al responsable; el código de la primera tarea fue `T-2026-000001`.
+- **Visibilidad:** el responsable ve 1 tarea; una asistente sin relación ve 0 y recibe 403 al abrirla o al descargar su evidencia.
+- **Notificaciones:** `TAREA_ASIGNADA` al responsable y aviso por SSE al revisor en el momento del avance.
+- **Avances:**
+  - Se rechazó un ejecutable con extensión `.pdf`.
+  - Un avance válido con un PDF de nombre acentuado pasó la tarea a En proceso con 60 % y 90 minutos.
+  - La descarga entregó el archivo con su nombre original y las cabeceras de seguridad.
+- **Comentarios:** se rechazó la mención a una persona ajena a la tarea; la mención válida notificó.
+- **Edición:** una edición con versión vieja devolvió 409, y un asistente sin `tarea:crear` recibió 403.
+- **Baja:** sin reasignar devolvió 409, y hacia una persona sin el cliente también, con el código de la tarea. Tras asignarle el cliente se completó: la tarea cambió de responsable y la receptora fue notificada.
+- **Worker:**
+  - Con tareas vencida, por vencer mañana y lejana generó 2 avisos de atraso (responsable y quien asignó) y 1 de vencimiento; la tarea lejana no generó avisos.
+  - Una segunda corrida generó 0 avisos.
+- **Web:** todas las páginas se renderizaron con datos reales; la vista previa del PDF y el flujo `/eventos` (con su latido) funcionaron a través de la web.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| Terminar, observar, corregir, aprobar y finalizar tareas; avisos de trabajo observado o aprobado (parte de RF-TAR-03 y RF-NOT-03) | La máquina de estados ya los contempla; las pantallas y endpoints de revisión llegan en el Sprint 4. |
+| Proyecto en tareas y filtros (RF-TAR-01, RF-TAR-10) | Se agrega con el módulo de proyectos. |
+| RF-AVA-07 Tiempo obligatorio u opcional | Hoy el campo es obligatorio y admite 0; se ajusta cuando se resuelva la decisión D-06. |
+| Límite de evidencias configurable (RF-AVA-03) | Fijo en 10 archivos y 24 MB por avance; pasa a parámetros con RF-CFG-03. Subirlo exige también ampliar `client_max_body_size` en nginx. |
+| Pestaña Tareas del expediente del cliente (RF-CLI-07) | Se suma con el Sprint 4; por ahora se filtra por cliente en Tareas. |
 
 ---
 
