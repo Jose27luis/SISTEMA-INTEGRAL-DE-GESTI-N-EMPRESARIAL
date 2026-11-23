@@ -1,17 +1,21 @@
 @theme {
-  --color-marino: #0b2545;
-  --color-marino-medio: #13315c;
-  --color-marino-claro: #1d4e89;
-  --color-dorado: #c9a227;
-  --color-dorado-suave: #f6efd6;
-  --color-verde: #2e7d32;
-  --color-verde-suave: #e6f2e7;
+  --color-marino: #01295d;
+  --color-marino-profundo: #001a3d;
+  --color-marino-medio: #0b3a7a;
+  --color-marino-claro: #1f5bb0;
+  --color-dorado: #f7c902;
+  --color-dorado-oscuro: #8a6a00;
+  --color-dorado-suave: #fdf6d6;
+  --color-verde: #008945;
+  --color-verde-oscuro: #006b36;
+  --color-verde-suave: #e2f4ea;
   --color-rojo: #b3261e;
   --color-rojo-suave: #fbe9e7;
-  --color-fondo: #f6f7f9;
+  --color-fondo: #f4f6f9;
   --color-superficie: #ffffff;
-  --color-borde: #dde2ea;
-  --color-tinta: #1b1f29;
-  --color-apagado: #5b6475;
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-borde: #d9dfe8;
+  --color-tinta: #0f1b2d;
+  --color-apagado: #56627a;
+  --font-sans: var(--fuente-jakarta), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--fuente-fraunces), Georgia, serif;
 }
