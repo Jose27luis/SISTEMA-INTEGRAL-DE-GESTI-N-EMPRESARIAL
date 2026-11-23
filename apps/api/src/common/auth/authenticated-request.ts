@@ -1,4 +1,4 @@
-import type { CodigoPermiso, PendienteIngreso } from '@sige/types';
+import type { AlcanceRol, CodigoPermiso, PendienteIngreso } from '@sige/types';
 import type { Request } from 'express';
 
 export interface UsuarioAutenticado {
@@ -6,6 +6,7 @@ export interface UsuarioAutenticado {
   sesionId: string;
   permisos: ReadonlySet<CodigoPermiso>;
   alcanceGlobal: boolean;
+  alcance: AlcanceRol;
   pendientes: readonly PendienteIngreso[];
 }
 
