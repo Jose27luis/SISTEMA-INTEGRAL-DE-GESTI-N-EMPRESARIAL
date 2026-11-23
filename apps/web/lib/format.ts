@@ -58,3 +58,22 @@ export function describirDispositivo(agente: string | null): string {
 
   return [navegador, sistema].filter((parte) => parte !== undefined).join(' en ');
 }
+
+export function formatearMinutos(minutos: number): string {
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+
+  if (horas === 0) {
+    return `${String(resto)} min`;
+  }
+
+  return resto === 0 ? `${String(horas)} h` : `${String(horas)} h ${String(resto)} min`;
+}
+
+export function formatearTamano(bytes: number): string {
+  if (bytes < 1024 * 1024) {
+    return `${String(Math.max(1, Math.round(bytes / 1024)))} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
