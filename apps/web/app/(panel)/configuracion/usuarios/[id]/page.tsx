@@ -1,5 +1,5 @@
-import { esquemaRolResumen, esquemaUsuarioDetalle } from '@sige/types';
-import { Alerta, Insignia, Tarjeta } from '@sige/ui/components';
+import { esquemaRolResumen, esquemaUsuarioDetalle, esquemaUsuarioResumen } from '@sige/types';
+import { Alerta, Insignia, Seleccion, Tarjeta } from '@sige/ui/components';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -60,6 +60,10 @@ export default async function PaginaUsuario({ params }: PropiedadesPaginaUsuario
   const roles = tienePermiso(perfil, 'rol:ver')
     ? await solicitarApi('/roles', { esquema: esquemaRolResumen.array() })
     : null;
+  const candidatos =
+    puedeGestionar && datos.activo && datos.tareasAbiertas > 0
+      ? await solicitarApi('/usuarios', { esquema: esquemaUsuarioResumen.array() })
+      : null;
 
   return (
     <>
@@ -160,7 +164,29 @@ export default async function PaginaUsuario({ params }: PropiedadesPaginaUsuario
                 variante="peligro"
                 pedirMotivo
                 consecuencia="Se cierran todas sus sesiones y no podrá ingresar hasta que se reactive."
-              />
+              >
+                {datos.tareasAbiertas > 0 ? (
+                  <Seleccion
+                    id="reasignarAId"
+                    name="reasignarAId"
+                    etiqueta="Reasignar sus tareas abiertas a"
+                    ayuda={`Tiene ${String(datos.tareasAbiertas)} ${datos.tareasAbiertas === 1 ? 'tarea abierta' : 'tareas abiertas'} como responsable o revisor. Quien las reciba debe estar asignado a los clientes de esas tareas.`}
+                    required
+                    defaultValue=""
+                  >
+                    <option value="" disabled>
+                      Seleccione
+                    </option>
+                    {(candidatos?.ok === true ? candidatos.datos : [])
+                      .filter((candidato) => candidato.activo && candidato.id !== datos.id)
+                      .map((candidato) => (
+                        <option key={candidato.id} value={candidato.id}>
+                          {candidato.nombre}
+                        </option>
+                      ))}
+                  </Seleccion>
+                ) : null}
+              </FormularioConfirmacion>
             ) : (
               <FormularioConfirmacion
                 accion={activarUsuario.bind(null, datos.id)}
