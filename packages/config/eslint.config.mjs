@@ -28,6 +28,13 @@ export function crearConfiguracionEslint(directorioRaiz) {
         '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
         '@typescript-eslint/consistent-type-imports': 'error',
         'no-warning-comments': 'error',
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector: "JSXAttribute[name.name='placeholder']",
+            message: 'Prohibido placeholder: use una etiqueta visible y un texto de ayuda.',
+          },
+        ],
       },
     },
   ];
