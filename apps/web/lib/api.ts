@@ -14,7 +14,16 @@ interface OpcionesSolicitud<T extends z.ZodType> {
   esquema: T;
   metodo?: MetodoHttp;
   cuerpo?: unknown;
+  formulario?: FormData;
   autenticado?: boolean;
+}
+
+function construirCuerpo(opciones: { cuerpo?: unknown; formulario?: FormData }): { body: BodyInit } | object {
+  if (opciones.formulario !== undefined) {
+    return { body: opciones.formulario };
+  }
+
+  return opciones.cuerpo === undefined ? {} : { body: JSON.stringify(opciones.cuerpo) };
 }
 
 const ERROR_CONEXION: ErrorApi = {
@@ -75,7 +84,7 @@ export async function solicitarApi<T extends z.ZodType>(
     cabeceras.set('authorization', `Bearer ${token}`);
   }
 
-  if (opciones.cuerpo !== undefined) {
+  if (opciones.cuerpo !== undefined && opciones.formulario === undefined) {
     cabeceras.set('content-type', 'application/json');
   }
 
@@ -86,7 +95,7 @@ export async function solicitarApi<T extends z.ZodType>(
       method: opciones.metodo ?? 'GET',
       headers: cabeceras,
       cache: 'no-store',
-      ...(opciones.cuerpo === undefined ? {} : { body: JSON.stringify(opciones.cuerpo) }),
+      ...construirCuerpo(opciones),
     });
   } catch {
     return { ok: false, estado: 503, error: ERROR_CONEXION };
@@ -110,4 +119,27 @@ export async function solicitarApi<T extends z.ZodType>(
   }
 
   return { ok: true, datos: datos.data };
+}
+
+export async function descargarDeApi(ruta: string): Promise<Response | null> {
+  const token = await leerSesion();
+
+  if (token === null) {
+    return null;
+  }
+
+  const cabeceras = await cabecerasCliente();
+  cabeceras.set('authorization', `Bearer ${token}`);
+  cabeceras.delete('accept');
+
+  try {
+    const respuesta = await fetch(`${leerEntorno().API_INTERNAL_URL}${ruta}`, {
+      headers: cabeceras,
+      cache: 'no-store',
+    });
+
+    return respuesta.ok ? respuesta : null;
+  } catch {
+    return null;
+  }
 }
