@@ -3,6 +3,9 @@ import type { CodigoPermiso } from '@sige/types';
 export type IconoNavegacion =
   | 'inicio'
   | 'cuenta'
+  | 'mi-trabajo'
+  | 'tareas'
+  | 'notificaciones'
   | 'clientes'
   | 'personal'
   | 'usuarios'
@@ -27,12 +30,15 @@ export const NAVEGACION: GrupoNavegacion[] = [
     titulo: 'General',
     elementos: [
       { ruta: '/inicio', etiqueta: 'Inicio', icono: 'inicio', permiso: null },
+      { ruta: '/mi-trabajo', etiqueta: 'Mi trabajo', icono: 'mi-trabajo', permiso: 'tarea:ver' },
+      { ruta: '/notificaciones', etiqueta: 'Notificaciones', icono: 'notificaciones', permiso: null },
       { ruta: '/mi-cuenta', etiqueta: 'Mi cuenta', icono: 'cuenta', permiso: null },
     ],
   },
   {
     titulo: 'Operación',
     elementos: [
+      { ruta: '/tareas', etiqueta: 'Tareas', icono: 'tareas', permiso: 'tarea:ver' },
       { ruta: '/clientes', etiqueta: 'Clientes', icono: 'clientes', permiso: 'cliente:ver' },
       { ruta: '/personal', etiqueta: 'Personal', icono: 'personal', permiso: 'personal:ver' },
     ],
