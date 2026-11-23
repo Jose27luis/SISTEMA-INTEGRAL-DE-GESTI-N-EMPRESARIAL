@@ -29,7 +29,7 @@ model Usuario {
   nombre                     String
   correo                     String    @unique @db.Citext
   hashContrasena             String    @map("hash_contrasena")
-  debeCambiarContrasena      Boolean   @default(true) @map("debe_cambiar_contrasena")
+  debeCambiarContrasena      Boolean   @default(false) @map("debe_cambiar_contrasena")
   mfaActivo                  Boolean   @default(false) @map("mfa_activo")
   mfaSecretoCifrado          String?   @map("mfa_secreto_cifrado")
   mfaSecretoPendienteCifrado String?   @map("mfa_secreto_pendiente_cifrado")
