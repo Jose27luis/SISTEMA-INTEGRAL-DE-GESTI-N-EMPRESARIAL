@@ -48,6 +48,12 @@ model Usuario {
   desafiosMfa          DesafioMfa[]
   codigosRecuperacion  CodigoRecuperacion[]
   registrosAuditoria   Auditoria[]
+  trabajador           Trabajador?
+  clientesResponsable  Cliente[]            @relation("ResponsableDelCliente")
+  clientesCreados      Cliente[]            @relation("CreadorDelCliente")
+  asignaciones         AsignacionCliente[]  @relation("AsignacionesDelUsuario")
+  asignacionesHechas   AsignacionCliente[]  @relation("AsignacionesHechasPor")
+  asignacionesRetiradas AsignacionCliente[] @relation("AsignacionesRetiradasPor")
 
   @@map("usuarios")
 }
@@ -181,4 +187,166 @@ model Auditoria {
   @@index([usuarioId, fecha])
   @@index([fecha])
   @@map("auditoria")
+}
+
+enum EstadoTrabajador {
+  ACTIVO
+  INACTIVO
+}
+
+enum TipoPersona {
+  NATURAL
+  JURIDICA
+}
+
+enum EstadoCliente {
+  ACTIVO
+  SUSPENDIDO
+  INACTIVO
+}
+
+enum RolEnCliente {
+  RESPONSABLE
+  APOYO
+  REVISOR
+  CONSULTA
+}
+
+model Area {
+  id       String   @id @default(uuid()) @db.Uuid
+  nombre   String   @unique @db.Citext
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  trabajadores Trabajador[]
+
+  @@map("areas")
+}
+
+model Cargo {
+  id       String   @id @default(uuid()) @db.Uuid
+  nombre   String   @unique @db.Citext
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  trabajadores Trabajador[]
+
+  @@map("cargos")
+}
+
+model TipoVinculo {
+  id       String   @id @default(uuid()) @db.Uuid
+  nombre   String   @unique @db.Citext
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  trabajadores Trabajador[]
+
+  @@map("tipos_vinculo")
+}
+
+model RegimenTributario {
+  id       String   @id @default(uuid()) @db.Uuid
+  nombre   String   @unique @db.Citext
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  clientes Cliente[]
+
+  @@map("regimenes_tributarios")
+}
+
+model Trabajador {
+  id                 String           @id @default(uuid()) @db.Uuid
+  usuarioId          String           @unique @map("usuario_id") @db.Uuid
+  nombres            String
+  apellidos          String
+  dni                String           @unique @db.Char(8)
+  cargoId            String           @map("cargo_id") @db.Uuid
+  areaId             String           @map("area_id") @db.Uuid
+  tipoVinculoId      String           @map("tipo_vinculo_id") @db.Uuid
+  fechaIncorporacion DateTime         @map("fecha_incorporacion") @db.Date
+  horario            String?
+  telefono           String?
+  funciones          String?
+  supervisorId       String?          @map("supervisor_id") @db.Uuid
+  estado             EstadoTrabajador @default(ACTIVO)
+  fechaCese          DateTime?        @map("fecha_cese") @db.Date
+  creadoEn           DateTime         @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn      DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+  cargo        Cargo        @relation(fields: [cargoId], references: [id])
+  area         Area         @relation(fields: [areaId], references: [id])
+  tipoVinculo  TipoVinculo  @relation(fields: [tipoVinculoId], references: [id])
+  supervisor   Trabajador?  @relation("Supervision", fields: [supervisorId], references: [id])
+  supervisados Trabajador[] @relation("Supervision")
+
+  @@index([estado])
+  @@map("trabajadores")
+}
+
+model Cliente {
+  id                  String        @id @default(uuid()) @db.Uuid
+  tipoPersona         TipoPersona   @map("tipo_persona")
+  razonSocial         String        @map("razon_social")
+  ruc                 String?       @unique @db.Char(11)
+  dni                 String?       @unique @db.Char(8)
+  domicilioFiscal     String?       @map("domicilio_fiscal")
+  representanteLegal  String?       @map("representante_legal")
+  actividadEconomica  String?       @map("actividad_economica")
+  regimenTributarioId String?       @map("regimen_tributario_id") @db.Uuid
+  fechaIncorporacion  DateTime      @map("fecha_incorporacion") @db.Date
+  estado              EstadoCliente @default(ACTIVO)
+  responsableId       String?       @map("responsable_id") @db.Uuid
+  creadoPorId         String?       @map("creado_por_id") @db.Uuid
+  creadoEn            DateTime      @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn       DateTime      @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  regimenTributario RegimenTributario?  @relation(fields: [regimenTributarioId], references: [id])
+  responsable       Usuario?            @relation("ResponsableDelCliente", fields: [responsableId], references: [id])
+  creadoPor         Usuario?            @relation("CreadorDelCliente", fields: [creadoPorId], references: [id])
+  contactos         ContactoCliente[]
+  asignaciones      AsignacionCliente[]
+
+  @@index([estado, razonSocial])
+  @@map("clientes")
+}
+
+model ContactoCliente {
+  id            String   @id @default(uuid()) @db.Uuid
+  clienteId     String   @map("cliente_id") @db.Uuid
+  nombre        String
+  cargo         String?
+  correo        String?  @db.Citext
+  telefono      String?
+  principal     Boolean  @default(false)
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+
+  @@index([clienteId, activo])
+  @@map("contactos_cliente")
+}
+
+model AsignacionCliente {
+  id            String       @id @default(uuid()) @db.Uuid
+  usuarioId     String       @map("usuario_id") @db.Uuid
+  clienteId     String       @map("cliente_id") @db.Uuid
+  rolEnCliente  RolEnCliente @map("rol_en_cliente")
+  asignadoEn    DateTime     @default(now()) @map("asignado_en") @db.Timestamptz(3)
+  asignadoPorId String?      @map("asignado_por_id") @db.Uuid
+  retiradoEn    DateTime?    @map("retirado_en") @db.Timestamptz(3)
+  retiradoPorId String?      @map("retirado_por_id") @db.Uuid
+
+  usuario     Usuario  @relation("AsignacionesDelUsuario", fields: [usuarioId], references: [id])
+  cliente     Cliente  @relation(fields: [clienteId], references: [id])
+  asignadoPor Usuario? @relation("AsignacionesHechasPor", fields: [asignadoPorId], references: [id])
+  retiradoPor Usuario? @relation("AsignacionesRetiradasPor", fields: [retiradoPorId], references: [id])
+
+  @@index([usuarioId, retiradoEn])
+  @@index([clienteId, retiradoEn])
+  @@map("asignaciones_cliente")
 }
