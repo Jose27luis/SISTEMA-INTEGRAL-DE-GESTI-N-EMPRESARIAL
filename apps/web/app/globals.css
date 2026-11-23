@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "@sige/ui/theme.css";
+
+@source "../../../packages/ui/src";
+
+@layer base {
+  body {
+    background-color: var(--color-fondo);
+    color: var(--color-tinta);
+  }
+}
