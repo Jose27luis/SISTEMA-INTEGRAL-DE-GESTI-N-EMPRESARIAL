@@ -65,7 +65,7 @@ export class GestionRolesService {
     const permisoIds = await this.validarPermisos(datos.permisoIds);
 
     if (anterior.codigo === CODIGO_ROL_GERENCIA) {
-      await this.validarRolGerencia(datos, permisoIds);
+      await this.validarRolGerencia(permisoIds);
     }
 
     const retirar = anterior.permisoIds.filter((permisoId) => !permisoIds.includes(permisoId));
@@ -179,13 +179,12 @@ export class GestionRolesService {
     return unicos;
   }
 
-  private async validarRolGerencia(datos: EdicionRol, permisoIds: readonly string[]): Promise<void> {
+  private async validarRolGerencia(permisoIds: readonly string[]): Promise<void> {
     const totalPermisos = await this.prisma.permiso.count();
 
-    if (!datos.exigeMfa || permisoIds.length !== totalPermisos) {
+    if (permisoIds.length !== totalPermisos) {
       throw new BadRequestException({
-        mensaje:
-          'El rol Gerencia General conserva todos los permisos y la verificación en dos pasos obligatoria.',
+        mensaje: 'El rol Gerencia General conserva todos los permisos.',
         errores: [],
       });
     }
