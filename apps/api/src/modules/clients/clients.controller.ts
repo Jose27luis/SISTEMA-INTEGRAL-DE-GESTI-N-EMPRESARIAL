@@ -74,6 +74,12 @@ export class ClientesController {
     return this.consulta.listar(filtro, usuario);
   }
 
+  @Get('opciones')
+  @RequierePermiso('cliente:ver')
+  opciones(@UsuarioActual() usuario: UsuarioAutenticado): Promise<{ id: string; nombre: string }[]> {
+    return this.consulta.opciones(usuario);
+  }
+
   @Get('usuarios-asignables')
   @RequierePermiso('cliente:ver')
   usuariosAsignables(): Promise<UsuarioAsignable[]> {
