@@ -5,3 +5,180 @@ datasource db {
 generator client {
   provider = "prisma-client-js"
 }
+
+enum AlcanceRol {
+  GLOBAL
+  ASIGNADO
+  PROPIO
+}
+
+enum AccionAuditoria {
+  CREAR
+  MODIFICAR
+  ACTIVAR
+  DESACTIVAR
+  INGRESAR
+  INGRESO_FALLIDO
+  SALIR
+  REVOCAR_SESION
+  PERMISO_DENEGADO
+}
+
+model Usuario {
+  id                         String    @id @default(uuid()) @db.Uuid
+  nombre                     String
+  correo                     String    @unique @db.Citext
+  hashContrasena             String    @map("hash_contrasena")
+  debeCambiarContrasena      Boolean   @default(true) @map("debe_cambiar_contrasena")
+  mfaActivo                  Boolean   @default(false) @map("mfa_activo")
+  mfaSecretoCifrado          String?   @map("mfa_secreto_cifrado")
+  mfaSecretoPendienteCifrado String?   @map("mfa_secreto_pendiente_cifrado")
+  intentosFallidos           Int       @default(0) @map("intentos_fallidos")
+  bloqueadoHasta             DateTime? @map("bloqueado_hasta") @db.Timestamptz(3)
+  activo                     Boolean   @default(true)
+  ultimoIngreso              DateTime? @map("ultimo_ingreso") @db.Timestamptz(3)
+  creadoEn                   DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn              DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  roles                UsuarioRol[]         @relation("RolesDelUsuario")
+  rolesAsignados       UsuarioRol[]         @relation("RolesAsignadosPor")
+  rolesRetirados       UsuarioRol[]         @relation("RolesRetiradosPor")
+  sesiones             Sesion[]             @relation("SesionesDelUsuario")
+  sesionesRevocadas    Sesion[]             @relation("SesionesRevocadasPor")
+  desafiosMfa          DesafioMfa[]
+  codigosRecuperacion  CodigoRecuperacion[]
+  registrosAuditoria   Auditoria[]
+
+  @@map("usuarios")
+}
+
+model Rol {
+  id          String     @id @default(uuid()) @db.Uuid
+  codigo      String     @unique
+  nombre      String
+  descripcion String?
+  alcance     AlcanceRol
+  exigeMfa    Boolean    @default(false) @map("exige_mfa")
+  esSistema   Boolean    @default(false) @map("es_sistema")
+  activo      Boolean    @default(true)
+  creadoEn    DateTime   @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  permisos RolPermiso[]
+  usuarios UsuarioRol[]
+
+  @@map("roles")
+}
+
+model Permiso {
+  id          String  @id @default(uuid()) @db.Uuid
+  codigo      String  @unique
+  modulo      String
+  descripcion String
+  sensible    Boolean @default(false)
+
+  roles RolPermiso[]
+
+  @@map("permisos")
+}
+
+model UsuarioRol {
+  id            String    @id @default(uuid()) @db.Uuid
+  usuarioId     String    @map("usuario_id") @db.Uuid
+  rolId         String    @map("rol_id") @db.Uuid
+  asignadoEn    DateTime  @default(now()) @map("asignado_en") @db.Timestamptz(3)
+  asignadoPorId String?   @map("asignado_por_id") @db.Uuid
+  retiradoEn    DateTime? @map("retirado_en") @db.Timestamptz(3)
+  retiradoPorId String?   @map("retirado_por_id") @db.Uuid
+
+  usuario     Usuario  @relation("RolesDelUsuario", fields: [usuarioId], references: [id])
+  rol         Rol      @relation(fields: [rolId], references: [id])
+  asignadoPor Usuario? @relation("RolesAsignadosPor", fields: [asignadoPorId], references: [id])
+  retiradoPor Usuario? @relation("RolesRetiradosPor", fields: [retiradoPorId], references: [id])
+
+  @@index([usuarioId, retiradoEn])
+  @@index([rolId, retiradoEn])
+  @@map("usuarios_roles")
+}
+
+model RolPermiso {
+  id         String    @id @default(uuid()) @db.Uuid
+  rolId      String    @map("rol_id") @db.Uuid
+  permisoId  String    @map("permiso_id") @db.Uuid
+  otorgadoEn DateTime  @default(now()) @map("otorgado_en") @db.Timestamptz(3)
+  retiradoEn DateTime? @map("retirado_en") @db.Timestamptz(3)
+
+  rol     Rol     @relation(fields: [rolId], references: [id])
+  permiso Permiso @relation(fields: [permisoId], references: [id])
+
+  @@index([rolId, retiradoEn])
+  @@map("roles_permisos")
+}
+
+model Sesion {
+  id               String    @id @default(uuid()) @db.Uuid
+  usuarioId        String    @map("usuario_id") @db.Uuid
+  hashToken        String    @unique @map("hash_token")
+  ip               String?
+  agenteUsuario    String?   @map("agente_usuario")
+  creadaEn         DateTime  @default(now()) @map("creada_en") @db.Timestamptz(3)
+  ultimoUso        DateTime  @default(now()) @map("ultimo_uso") @db.Timestamptz(3)
+  expiraEn         DateTime  @map("expira_en") @db.Timestamptz(3)
+  revocadaEn       DateTime? @map("revocada_en") @db.Timestamptz(3)
+  revocadaPorId    String?   @map("revocada_por_id") @db.Uuid
+  motivoRevocacion String?   @map("motivo_revocacion")
+
+  usuario     Usuario  @relation("SesionesDelUsuario", fields: [usuarioId], references: [id])
+  revocadaPor Usuario? @relation("SesionesRevocadasPor", fields: [revocadaPorId], references: [id])
+
+  @@index([usuarioId, revocadaEn])
+  @@map("sesiones")
+}
+
+model DesafioMfa {
+  id        String    @id @default(uuid()) @db.Uuid
+  usuarioId String    @map("usuario_id") @db.Uuid
+  creadoEn  DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+  expiraEn  DateTime  @map("expira_en") @db.Timestamptz(3)
+  intentos  Int       @default(0)
+  usadoEn   DateTime? @map("usado_en") @db.Timestamptz(3)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@map("desafios_mfa")
+}
+
+model CodigoRecuperacion {
+  id           String    @id @default(uuid()) @db.Uuid
+  usuarioId    String    @map("usuario_id") @db.Uuid
+  hashCodigo   String    @map("hash_codigo")
+  creadoEn     DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+  usadoEn      DateTime? @map("usado_en") @db.Timestamptz(3)
+  invalidadoEn DateTime? @map("invalidado_en") @db.Timestamptz(3)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, hashCodigo])
+  @@map("codigos_recuperacion")
+}
+
+model Auditoria {
+  id        BigInt          @id @default(autoincrement())
+  fecha     DateTime        @default(now()) @db.Timestamptz(3)
+  usuarioId String?         @map("usuario_id") @db.Uuid
+  sesionId  String?         @map("sesion_id") @db.Uuid
+  ip        String?
+  accion    AccionAuditoria
+  entidad   String
+  entidadId String?         @map("entidad_id")
+  antes     Json?
+  despues   Json?
+  motivo    String?
+
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([entidad, entidadId, fecha])
+  @@index([usuarioId, fecha])
+  @@index([fecha])
+  @@map("auditoria")
+}
