@@ -310,13 +310,13 @@ flowchart LR
 | Código | Requerimiento | Prioridad | Fase |
 |---|---|---|---|
 | RF-AUT-01 | El usuario inicia sesión con correo y contraseña propios. No existen cuentas compartidas. | M | 1 |
-| RF-AUT-02 | Los perfiles Gerencia General y Administración deben activar MFA por TOTP (aplicación autenticadora) en su primer ingreso; para los demás perfiles es configurable. | M | 1 |
+| RF-AUT-02 | MFA por TOTP (aplicación autenticadora) opcional para cada usuario desde Mi cuenta; cada rol puede configurarse para exigirlo. Por decisión de Gerencia (23/11/2026) ningún rol lo exige por defecto. | M | 1 |
 | RF-AUT-03 | El sistema bloquea temporalmente la cuenta tras 5 intentos fallidos consecutivos durante 15 minutos y registra cada intento en auditoría. | M | 1 |
 | RF-AUT-04 | El usuario puede cerrar su sesión y ver sus sesiones activas (dispositivo, IP, último uso) y cerrarlas de forma remota. | M | 1 |
 | RF-AUT-05 | Gerencia puede revocar todas las sesiones de un usuario y desactivarlo; el acceso se corta en la siguiente petición. | M | 1 |
 | RF-AUT-06 | La sesión expira tras un periodo de inactividad configurable (por defecto 30 minutos) y por duración máxima (por defecto 8 horas). | M | 1 |
 | RF-AUT-07 | Recuperación de contraseña mediante enlace de un solo uso enviado al correo registrado, con vigencia de 30 minutos. | S | 1 |
-| RF-AUT-08 | Cambio de contraseña obligatorio en el primer ingreso cuando la cuenta la crea Gerencia. | M | 1 |
+| RF-AUT-08 | **Retirado** (23/11/2026, decisión de Gerencia): Gerencia define la contraseña de cada usuario y no se obliga a cambiarla en el primer ingreso. | — | — |
 | RF-AUT-09 | Códigos de recuperación de MFA de un solo uso, generados al activarlo. | S | 1 |
 
 ### 5.3 Roles y permisos (ROL)
@@ -607,7 +607,7 @@ Atributos de calidad del sistema, organizados según ISO/IEC 25010. Cada requeri
 | Código | Requerimiento | Verificación |
 |---|---|---|
 | RNF-SEG-01 | Las contraseñas se almacenan con Argon2id (memoria ≥ 19 MiB, iteraciones ≥ 2) o, si no es viable, bcrypt con costo ≥ 12. Nunca en texto plano ni con hash reversible. | Revisión de código y de la tabla de usuarios. |
-| RNF-SEG-02 | Política de contraseñas: mínimo 12 caracteres, verificadas contra una lista de contraseñas comunes; sin reglas de composición arbitrarias. | Prueba automatizada del validador. |
+| RNF-SEG-02 | Política de contraseñas definida por Gerencia (decisión del 23/11/2026): sin longitud mínima ni reglas de composición, máximo 128 caracteres. **Riesgo aceptado:** las contraseñas cortas son más fáciles de adivinar y, sin verificación en dos pasos obligatoria, la contraseña es la única barrera; lo mitigan el bloqueo tras 5 intentos, el límite de 10 intentos por minuto y la verificación en dos pasos opcional. | Revisión del esquema `esquemaContrasena`. |
 | RNF-SEG-03 | MFA TOTP (RFC 6238) obligatorio para perfiles privilegiados; el secreto TOTP se guarda cifrado con AES-256-GCM y clave fuera de la base de datos. | Prueba de ingreso y revisión de la columna cifrada. |
 | RNF-SEG-04 | El token de sesión viaja solo en cookie `HttpOnly`, `Secure`, `SameSite=Lax`; nunca en `localStorage`. Cada sesión tiene un identificador revocable en base de datos. | Inspección del navegador y prueba de revocación. |
 | RNF-SEG-05 | Autorización en el servidor en cada petición: rol, permiso y asignación al cliente. La interfaz solo oculta opciones; nunca es la única barrera. | Pruebas e2e que llaman a la API con usuarios sin permiso y esperan 403. |
@@ -2805,7 +2805,7 @@ Aspectos que conviene decidir antes de diseñar cada fase, con una recomendació
 | D-09 | Datos personales | Revisión por asesor legal de la base legal, consentimiento y plazos de conservación según la Ley N.° 29733 y su reglamento. | Fase 1 |
 | D-10 | Titularidad | Cesión total del código fuente y la base de datos a TORRES ASOCIADOS al cierre de cada fase pagada; licencias de terceros y condiciones de mantenimiento por contrato. | Fase 0 |
 | D-11 | Migración | Inventario de Excel y carpetas actuales en la Fase 0; importadores para clientes (Fase 1) y documentos (Fase 2). | Fase 0 |
-| D-12 | Logotipo y guía visual | Reutilizar los recursos de marca de torresasociados.pe si Gerencia lo autoriza. | Fase 0 |
+| D-12 | Logotipo y guía visual | **Decidido:** se usan el logotipo y la marca «TA» oficiales de torresasociados.pe, sus colores (`#01295d`, `#f7c902`, `#008945`) y sus tipografías (Plus Jakarta Sans y Fraunces). | — |
 | D-13 | Leads del sitio web | Integrar los leads de torresasociados.pe como oportunidades mediante un endpoint con token, igual que la integración existente con cr3s3r. | Fase 4 |
 | D-14 | WhatsApp Business | Evaluar costo por conversación y requisitos de verificación de Meta antes de comprometerlo. | Fase 5 |
 | D-15 | Dominio | **Decidido:** `https://sige.torresasociados.pe`, detrás de Cloudflare (modo Full) con certificado Let's Encrypt en el origen (ver [Publicación en el servidor](#126-publicación-en-el-servidor)). | — |
@@ -2984,7 +2984,7 @@ Toda la documentación del proyecto (requerimientos, arquitectura, modelo de dat
 | `@sige/ui` | `packages/ui` | Tema institucional (`theme.css`), la utilidad `cn` y componentes accesibles: `Boton`, `Campo`, `AreaTexto`, `Seleccion`, `Casilla`, `Alerta`, `Insignia`, `Tarjeta`. |
 | `@sige/config` | `packages/config` | Configuración ESLint compartida: `typescript-eslint` estricto con tipos, `any` y `@ts-ignore` prohibidos, y regla que prohíbe el atributo `placeholder` en JSX. |
 
-Los códigos de color de `packages/ui/src/theme.css` son provisionales hasta que Gerencia entregue la guía visual oficial (decisión D-12).
+Los colores de `packages/ui/src/theme.css` salen del logotipo oficial (decisión D-12): azul marino `#01295d`, amarillo `#f7c902` y verde `#008945`. El amarillo no tiene contraste suficiente como texto sobre blanco, por lo que en fondos claros se usa `dorado-oscuro` y el amarillo queda para acentos sobre azul marino. El logotipo y la marca están en `apps/web/public/brand/`.
 
 ### 12.5 Puesta en marcha
 
@@ -3019,10 +3019,10 @@ Variables de sesión opcionales: `SESION_DURACION_HORAS` (por defecto 8) y `SESI
 Primer usuario de Gerencia (no existe alta de usuarios desde la web hasta el módulo de Personal del Sprint 2):
 
 ```bash
-docker compose exec api node dist/scripts/create-user.js --nombre "Nombre Apellido" --correo correo@dominio.pe --rol GERENCIA
+docker compose exec api node dist/scripts/create-user.js --nombre "Nombre Apellido" --correo correo@dominio.pe --rol GERENCIA --contrasena "clave-definida-por-gerencia"
 ```
 
-El comando muestra una contraseña temporal una sola vez; en el primer ingreso el sistema obliga a cambiarla y, por el rol, a configurar la verificación en dos pasos.
+La contraseña la define quien crea el usuario. En el primer ingreso, si algún rol del usuario exige verificación en dos pasos, el sistema pide configurarla antes de continuar.
 
 ### 12.6 Publicación en el servidor
 
@@ -3068,14 +3068,14 @@ Las pruebas de integración contra PostgreSQL y las e2e con Playwright (sección
 |---|---|---|
 | `POST /auth/ingreso` | Público, 10 por minuto por IP | Correo y contraseña; responde `SESION_INICIADA` o `MFA_REQUERIDO`. |
 | `POST /auth/mfa/verificacion` | Público, 10 por minuto por IP | Código TOTP o de recuperación contra un desafío de 5 minutos y 5 intentos. |
-| `GET /auth/perfil` | Sesión, aun con pendientes | Usuario, roles, permisos, alcance y pendientes (`CAMBIAR_CONTRASENA`, `CONFIGURAR_MFA`). |
+| `GET /auth/perfil` | Sesión, aun con pendientes | Usuario, roles, permisos, alcance y pendientes (`CONFIGURAR_MFA`). |
 | `POST /auth/contrasena` | Sesión, aun con pendientes | Cambio de contraseña; cierra las demás sesiones del usuario. |
 | `POST /auth/mfa/configuracion` · `POST /auth/mfa/activacion` | Sesión, aun con pendientes | QR y secreto TOTP; activación con 10 códigos de recuperación. |
 | `GET /auth/sesiones` · `POST /auth/sesiones/:id/cierre` · `POST /auth/salida` | Sesión | Sesiones propias abiertas, cierre remoto y cierre de la actual. |
 | `GET /usuarios` · `GET /usuarios/:id` | `usuario:ver` | Listado y detalle con sesiones abiertas. |
 | `PUT /usuarios/:id/roles` | `usuario:gestionar` | Asignación de roles. |
 | `POST /usuarios/:id/desactivacion` · `/activacion` · `/restablecimiento-mfa` | `usuario:gestionar` | Con motivo obligatorio. |
-| `POST /usuarios/:id/restablecimiento-contrasena` | `usuario:gestionar` | Genera una contraseña temporal que se muestra una sola vez, obliga a cambiarla, quita el bloqueo y cierra las sesiones. |
+| `POST /usuarios/:id/restablecimiento-contrasena` | `usuario:gestionar` | Asigna la contraseña que escribe Gerencia, con motivo; quita el bloqueo y cierra las sesiones del usuario. |
 | `POST /usuarios/:id/revocacion-sesiones` | `sesion:revocar` | Con motivo obligatorio. |
 | `GET /roles` · `GET /roles/:id` · `GET /permisos` | `rol:ver` | Roles con permisos y usuarios activos; catálogo de permisos. |
 | `POST /roles` · `PUT /roles/:id` · `POST /roles/:id/desactivacion` · `/activacion` | `rol:gestionar` | Alta, edición y estado de roles. |
@@ -3089,13 +3089,13 @@ Las pruebas de integración contra PostgreSQL y las e2e con Playwright (sección
 - Mientras haya pendientes, la API solo atiende los endpoints de cuenta y la web redirige a la pantalla correspondiente.
 - Cada acceso denegado por permisos queda en auditoría como `PERMISO_DENEGADO` con método y ruta.
 - Siempre debe quedar al menos un usuario activo con el rol Gerencia General; nadie puede desactivar su propia cuenta.
-- El rol Gerencia General conserva todos los permisos y la verificación en dos pasos obligatoria; los roles del sistema no se desactivan; un rol con usuarios activos no se desactiva.
-- Política de contraseñas: de 12 a 128 caracteres; rechaza secuencias predecibles (`password`, `123456`, `qwerty`, el nombre de la empresa), el nombre y el usuario de correo de la persona, y la repetición de un solo carácter.
+- El rol Gerencia General conserva todos los permisos; la verificación en dos pasos es opcional y cada rol puede exigirla; los roles del sistema no se desactivan; un rol con usuarios activos no se desactiva.
+- Contraseñas definidas por Gerencia, sin longitud mínima (RNF-SEG-02); el usuario puede cambiarla desde Mi cuenta indicando la actual.
 - Las acciones irreversibles en la web piden motivo y una casilla de confirmación que explica la consecuencia.
 
-**Verificación realizada:** typecheck, lint y 29 pruebas unitarias (política de contraseñas, cifrado AES-256-GCM, tokens, TOTP, bloqueo, Argon2id y pendientes). El flujo completo se probó contra un stack desechable con PostgreSQL real. Se cubrieron:
+**Verificación realizada:** typecheck, lint y 22 pruebas unitarias (cifrado AES-256-GCM, tokens, TOTP, bloqueo, Argon2id y pendientes). El flujo completo se probó contra un stack desechable con PostgreSQL real. Se cubrieron:
 
-- Primer ingreso, cambio de contraseña y activación de MFA.
+- Primer ingreso y activación de MFA.
 - Ingreso con TOTP, con código de recuperación y su reutilización rechazada.
 - Permisos denegados y revocación de sesiones.
 - Bloqueo tras 5 intentos, límite de 10 intentos por minuto y protecciones de Gerencia.
@@ -3107,9 +3107,8 @@ Las pruebas de integración contra PostgreSQL y las e2e con Playwright (sección
 
 | Requerimiento | Situación |
 |---|---|
-| RF-AUT-07 Recuperación de contraseña por correo | Requiere SMTP (RF-INT-01, Fase 5). Mientras tanto, Gerencia genera una contraseña temporal desde el detalle del usuario. |
+| RF-AUT-07 Recuperación de contraseña por correo | Requiere SMTP (RF-INT-01, Fase 5). Mientras tanto, Gerencia asigna una nueva contraseña desde el detalle del usuario. |
 | RF-AUD-04 Exportación de la auditoría | Se implementa con la exportación a Excel y PDF del Sprint 4 (RF-REP-01). |
-| RNF-SEG-02 Lista de contraseñas comunes | Se aplica la lista de secuencias predecibles descrita arriba; una lista amplia de contraseñas filtradas queda por definir. |
 | Pruebas e2e automatizadas | Pendientes de incorporar Playwright a la integración continua. |
 
 ---
