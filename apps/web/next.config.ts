@@ -8,7 +8,7 @@ const configuracion: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
   experimental: {
-    serverActions: { bodySizeLimit: '6mb' },
+    serverActions: { bodySizeLimit: '25mb' },
   },
 };
 
