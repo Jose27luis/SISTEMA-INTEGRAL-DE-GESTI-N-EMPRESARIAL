@@ -25,6 +25,29 @@ export function horaEnLima(fecha: Date): string {
   });
 }
 
+const FORMATO_FECHA_LIMA = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Lima',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export function fechaHoyEnLima(): string {
+  return FORMATO_FECHA_LIMA.format(new Date());
+}
+
+export function aFechaDb(fecha: string): Date {
+  return new Date(`${fecha}T00:00:00.000Z`);
+}
+
+export function aFechaIso(fecha: Date): string {
+  return fecha.toISOString().slice(0, 10);
+}
+
+export function aFechaIsoONula(fecha: Date | null): string | null {
+  return fecha === null ? null : aFechaIso(fecha);
+}
+
 export function sumarMinutos(fecha: Date, minutos: number): Date {
   return new Date(fecha.getTime() + minutos * 60_000);
 }
