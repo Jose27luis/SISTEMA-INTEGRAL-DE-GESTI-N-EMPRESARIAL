@@ -194,7 +194,7 @@ export class GestionPersonalService {
       });
     }
 
-    await this.usuarios.desactivar(trabajador.usuarioId, cese.motivo, actor, cese.fechaCese);
+    await this.usuarios.desactivar(trabajador.usuarioId, cese.motivo, actor, cese.fechaCese, cese.reasignarAId);
 
     return this.consulta.obtener(id);
   }
