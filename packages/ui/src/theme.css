@@ -1,0 +1,17 @@
+@theme {
+  --color-marino: #0b2545;
+  --color-marino-medio: #13315c;
+  --color-marino-claro: #1d4e89;
+  --color-dorado: #c9a227;
+  --color-dorado-suave: #f6efd6;
+  --color-verde: #2e7d32;
+  --color-verde-suave: #e6f2e7;
+  --color-rojo: #b3261e;
+  --color-rojo-suave: #fbe9e7;
+  --color-fondo: #f6f7f9;
+  --color-superficie: #ffffff;
+  --color-borde: #dde2ea;
+  --color-tinta: #1b1f29;
+  --color-apagado: #5b6475;
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
