@@ -10,6 +10,7 @@ const esquemaEntorno = z.object({
     .regex(/^[0-9a-f]{64}$/, 'Debe ser una clave hexadecimal de 64 caracteres'),
   SESION_DURACION_HORAS: z.coerce.number().int().min(1).max(24).default(8),
   SESION_INACTIVIDAD_MINUTOS: z.coerce.number().int().min(5).max(240).default(30),
+  DIRECTORIO_ARCHIVOS: z.string().min(1).default('/app/almacen'),
 });
 
 export type Entorno = z.infer<typeof esquemaEntorno>;
