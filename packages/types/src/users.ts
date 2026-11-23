@@ -15,7 +15,15 @@ export const esquemaUsuarioResumen = z.object({
 export const esquemaUsuarioDetalle = esquemaUsuarioResumen.extend({
   creadoEn: z.iso.datetime(),
   sesiones: z.array(esquemaSesionResumen),
+  tareasAbiertas: z.number().int().nonnegative(),
 });
+
+export const esquemaDesactivacionUsuario = z.object({
+  motivo: z.string().trim().min(5).max(500),
+  reasignarAId: z.uuid().nullable().default(null),
+});
+
+export type DesactivacionUsuario = z.infer<typeof esquemaDesactivacionUsuario>;
 
 export const esquemaAsignacionRoles = z.object({
   rolIds: z.array(z.uuid()).max(20),
