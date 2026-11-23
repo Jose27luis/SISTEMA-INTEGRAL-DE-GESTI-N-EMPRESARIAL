@@ -3,6 +3,8 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "lib": ["dom", "dom.iterable", "ES2023"],
+    "jsx": "react-jsx",
     "noEmit": true,
     "declaration": false,
     "sourceMap": false
