@@ -1,6 +1,6 @@
 'use server';
 
-import { esquemaCambioContrasena, LONGITUD_MINIMA_CONTRASENA } from '@sige/types';
+import { esquemaCambioContrasena } from '@sige/types';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { solicitarApi } from '@/lib/api';
@@ -27,10 +27,7 @@ export async function cambiarContrasena(
       mensaje: 'Revise los datos ingresados.',
       errores: entrada.error.issues.map((problema) => ({
         campo: problema.path.map(String).join('.'),
-        mensaje:
-          problema.path[0] === 'nueva'
-            ? `La nueva contraseña debe tener al menos ${String(LONGITUD_MINIMA_CONTRASENA)} caracteres.`
-            : 'Ingrese su contraseña actual.',
+        mensaje: problema.path[0] === 'nueva' ? problema.message : 'Ingrese su contraseña actual.',
       })),
     });
   }
@@ -45,5 +42,5 @@ export async function cambiarContrasena(
     return estadoConError(resultado.error);
   }
 
-  redirect('/inicio');
+  redirect('/mi-cuenta');
 }
