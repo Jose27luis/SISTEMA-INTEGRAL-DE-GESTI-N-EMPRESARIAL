@@ -1,9 +1,11 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import type { RestablecimientoContrasena, UsuarioDetalle } from '@sige/types';
+import { aFechaDb, fechaHoyEnLima } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { HashContrasenas } from '../security/password-hasher.service';
 import { CODIGO_ROL_GERENCIA } from '../access-control/effective-permissions.service';
-import { type ActorAuditoria, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
+import { ContinuidadGerenciaService } from '../access-control/management-continuity.service';
+import { type ActorAuditoria, AuditoriaService } from '../audit/audit.service';
 import { SesionesService } from '../auth/sessions.service';
 import { ConsultaUsuariosService } from './users-query.service';
 
@@ -15,6 +17,7 @@ export class GestionUsuariosService {
     private readonly sesiones: SesionesService,
     private readonly consulta: ConsultaUsuariosService,
     private readonly hash: HashContrasenas,
+    private readonly continuidad: ContinuidadGerenciaService,
   ) {}
 
   async asignarRoles(
@@ -47,7 +50,7 @@ export class GestionUsuariosService {
 
     await this.prisma.$transaction(async (tx) => {
       if (pierdeGerencia) {
-        await this.asegurarOtraGerencia(usuarioId, tx);
+        await this.continuidad.asegurarOtraGerencia(usuarioId, tx);
       }
 
       const ahora = new Date();
@@ -81,7 +84,12 @@ export class GestionUsuariosService {
     return this.consulta.obtener(usuarioId);
   }
 
-  async desactivar(usuarioId: string, motivo: string, actor: ActorAuditoria): Promise<UsuarioDetalle> {
+  async desactivar(
+    usuarioId: string,
+    motivo: string,
+    actor: ActorAuditoria,
+    fechaCese: string = fechaHoyEnLima(),
+  ): Promise<UsuarioDetalle> {
     if (usuarioId === actor.usuarioId) {
       throw new BadRequestException({ mensaje: 'No puede desactivar su propia cuenta.', errores: [] });
     }
@@ -94,10 +102,21 @@ export class GestionUsuariosService {
 
     await this.prisma.$transaction(async (tx) => {
       if (usuario.roles.some(({ codigo }) => codigo === CODIGO_ROL_GERENCIA)) {
-        await this.asegurarOtraGerencia(usuarioId, tx);
+        await this.continuidad.asegurarOtraGerencia(usuarioId, tx);
       }
 
+      const ahora = new Date();
+
       await tx.usuario.update({ where: { id: usuarioId }, data: { activo: false } });
+      await tx.trabajador.updateMany({
+        where: { usuarioId },
+        data: { estado: 'INACTIVO', fechaCese: aFechaDb(fechaCese) },
+      });
+
+      const asignaciones = await tx.asignacionCliente.updateMany({
+        where: { usuarioId, retiradoEn: null },
+        data: { retiradoEn: ahora, retiradoPorId: actor.usuarioId },
+      });
 
       const sesionesCerradas = await this.sesiones.revocarDeUsuario(
         usuarioId,
@@ -113,7 +132,12 @@ export class GestionUsuariosService {
           entidad: 'usuario',
           entidadId: usuarioId,
           antes: { activo: true },
-          despues: { activo: false, sesionesCerradas },
+          despues: {
+            activo: false,
+            fechaCese,
+            sesionesCerradas,
+            clientesRetirados: asignaciones.count,
+          },
           motivo,
         },
         tx,
@@ -134,6 +158,10 @@ export class GestionUsuariosService {
       await tx.usuario.update({
         where: { id: usuarioId },
         data: { activo: true, intentosFallidos: 0, bloqueadoHasta: null },
+      });
+      await tx.trabajador.updateMany({
+        where: { usuarioId },
+        data: { estado: 'ACTIVO', fechaCese: null },
       });
       await this.auditoria.registrar(
         {
@@ -277,23 +305,5 @@ export class GestionUsuariosService {
     });
 
     return this.consulta.obtener(usuarioId);
-  }
-
-  private async asegurarOtraGerencia(usuarioId: string, db: ClienteBaseDatos): Promise<void> {
-    const otras = await db.usuarioRol.count({
-      where: {
-        usuarioId: { not: usuarioId },
-        retiradoEn: null,
-        rol: { codigo: CODIGO_ROL_GERENCIA, activo: true },
-        usuario: { activo: true },
-      },
-    });
-
-    if (otras === 0) {
-      throw new ConflictException({
-        mensaje: 'Debe quedar al menos un usuario activo con el rol Gerencia General.',
-        errores: [],
-      });
-    }
   }
 }
