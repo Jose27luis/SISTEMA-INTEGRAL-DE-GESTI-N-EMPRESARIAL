@@ -48,6 +48,7 @@ export const esquemaAltaTrabajador = esquemaFichaTrabajador.extend({
 export const esquemaCeseTrabajador = z.object({
   fechaCese: z.iso.date('Ingrese la fecha de cese.'),
   motivo: z.string().trim().min(5, 'Describa el motivo en al menos 5 caracteres.').max(500),
+  reasignarAId: z.uuid().nullable(),
 });
 
 export const esquemaReactivacionTrabajador = z.object({
@@ -76,6 +77,7 @@ export const esquemaTrabajadorDetalle = esquemaTrabajadorResumen.extend({
   fechaCese: z.iso.date().nullable(),
   roles: z.array(esquemaRolReferencia),
   clientesAsignados: z.number().int().nonnegative(),
+  tareasAbiertas: z.number().int().nonnegative(),
 });
 
 export const esquemaUsuarioSinFicha = z.object({
