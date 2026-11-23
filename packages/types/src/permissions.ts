@@ -7,6 +7,12 @@ export const CODIGOS_PERMISO = [
   'rol:ver',
   'rol:gestionar',
   'auditoria:ver',
+  'personal:ver',
+  'personal:gestionar',
+  'cliente:ver',
+  'cliente:gestionar',
+  'cliente:asignar',
+  'catalogo:gestionar',
 ] as const;
 
 export const esquemaCodigoPermiso = z.enum(CODIGOS_PERMISO);
