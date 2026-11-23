@@ -137,7 +137,14 @@ export default async function PaginaTrabajador({ params }: PropiedadesPaginaTrab
               }
             >
               {trabajador.estado === 'ACTIVO' ? (
-                <FormularioBaja accion={cesarTrabajador.bind(null, trabajador.id)} fechaHoy={fechaHoyEnLima()} />
+                <FormularioBaja
+                  accion={cesarTrabajador.bind(null, trabajador.id)}
+                  fechaHoy={fechaHoyEnLima()}
+                  tareasAbiertas={trabajador.tareasAbiertas}
+                  candidatos={(opciones?.supervisores ?? [])
+                    .filter((persona) => persona.usuarioId !== trabajador.usuarioId)
+                    .map((persona) => ({ id: persona.usuarioId, nombre: `${persona.nombres} ${persona.apellidos}` }))}
+                />
               ) : (
                 <FormularioConfirmacion
                   accion={reactivarTrabajador.bind(null, trabajador.id)}
