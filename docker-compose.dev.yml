@@ -1,0 +1,30 @@
+services:
+  db:
+    ports:
+      - "127.0.0.1:5434:5432"
+
+  api:
+    build:
+      target: development
+    image: sige/api:dev
+    command: sh -c "pnpm --filter @sige/types build && pnpm --filter @sige/api dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./apps/api/prisma:/app/apps/api/prisma
+      - ./packages/types/src:/app/packages/types/src
+
+  web:
+    build:
+      target: development
+    image: sige/web:dev
+    command: sh -c "pnpm --filter @sige/types build && pnpm --filter @sige/web dev"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./apps/web/app:/app/apps/web/app
+      - ./apps/web/components:/app/apps/web/components
+      - ./apps/web/lib:/app/apps/web/lib
+      - ./packages/types/src:/app/packages/types/src
+      - ./packages/ui/src:/app/packages/ui/src
