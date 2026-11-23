@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { UsuarioDetalle, UsuarioResumen } from '@sige/types';
+import { ESTADOS_CERRADOS, type UsuarioDetalle, type UsuarioResumen } from '@sige/types';
 import { aIso, aIsoONulo } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SesionesService } from '../auth/sessions.service';
@@ -59,6 +59,12 @@ export class ConsultaUsuariosService {
       ...aResumen(usuario, new Date()),
       creadoEn: aIso(usuario.creadoEn),
       sesiones: await this.sesiones.listarVigentes(usuario.id, null),
+      tareasAbiertas: await this.prisma.tarea.count({
+        where: {
+          estado: { notIn: [...ESTADOS_CERRADOS] },
+          OR: [{ responsableId: usuario.id }, { revisorId: usuario.id }],
+        },
+      }),
     };
   }
 }
