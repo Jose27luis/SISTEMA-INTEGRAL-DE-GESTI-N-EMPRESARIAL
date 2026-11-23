@@ -10,7 +10,7 @@ export default async function PaginaEstado(): Promise<ReactNode> {
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-8 px-4 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-sm font-semibold tracking-widest text-dorado uppercase">
+        <p className="text-sm font-semibold tracking-widest text-dorado-oscuro uppercase">
           TORRES ASOCIADOS
         </p>
         <h1 className="text-3xl font-bold text-marino">Sistema Integral de Gestión Empresarial</h1>
