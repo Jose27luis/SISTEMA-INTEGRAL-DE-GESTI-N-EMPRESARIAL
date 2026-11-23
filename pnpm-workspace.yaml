@@ -1,0 +1,17 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+overrides:
+  "effect@<3.22.1": "^3.22.1"
+
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  "@tailwindcss/oxide": true
+  esbuild: true
+  msgpackr-extract: false
+  prisma: true
+  sharp: true
+  unrs-resolver: true
+  workerd: false
