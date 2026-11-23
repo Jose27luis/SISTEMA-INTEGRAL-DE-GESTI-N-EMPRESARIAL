@@ -127,6 +127,7 @@ export async function cesarTrabajador(
   const entrada = esquemaCeseTrabajador.safeParse({
     fechaCese: leerTexto(datos, 'fechaCese'),
     motivo: leerTexto(datos, 'motivo'),
+    reasignarAId: leerOpcional(datos, 'reasignarAId'),
   });
 
   if (!entrada.success) {
@@ -144,7 +145,9 @@ export async function cesarTrabajador(
   }
 
   revalidatePath('/personal', 'layout');
-  return estadoExitoso('Baja registrada. Su acceso y sus asignaciones a clientes quedaron retirados.');
+  return estadoExitoso(
+    'Baja registrada. Su acceso y sus asignaciones a clientes quedaron retirados y sus tareas abiertas fueron reasignadas.',
+  );
 }
 
 export async function reactivarTrabajador(
