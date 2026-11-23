@@ -53,6 +53,7 @@ COPY --from=prod-deps --chown=sige:sige /app/apps/api/node_modules ./apps/api/no
 COPY --from=prod-deps --chown=sige:sige /app/apps/api/package.json ./apps/api/package.json
 COPY --from=prod-deps --chown=sige:sige /app/apps/api/prisma ./apps/api/prisma
 COPY --from=prod-deps --chown=sige:sige /app/apps/api/prisma.config.ts ./apps/api/prisma.config.ts
+COPY --from=prod-deps --chown=sige:sige /app/packages/types/node_modules ./packages/types/node_modules
 COPY --from=build --chown=sige:sige /app/packages/types/package.json ./packages/types/package.json
 COPY --from=build --chown=sige:sige /app/packages/types/dist ./packages/types/dist
 COPY --from=build --chown=sige:sige /app/apps/api/dist ./apps/api/dist
