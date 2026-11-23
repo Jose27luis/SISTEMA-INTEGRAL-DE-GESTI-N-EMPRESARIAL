@@ -1,5 +1,6 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import type { EstadoSalud } from '@sige/types';
+import { Publico } from '../../common/auth/decorators';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Controller('health')
@@ -7,6 +8,7 @@ export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @Publico()
   async verificar(): Promise<EstadoSalud> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
