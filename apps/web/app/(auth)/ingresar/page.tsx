@@ -1,6 +1,8 @@
-import { Alerta } from '@sige/ui/components';
+import { Info } from 'lucide-react';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { Aparecer } from '@/components/auth/appear';
+import { EncabezadoAcceso } from '@/components/auth-heading';
 import { FormularioIngreso } from './login-form';
 
 export const metadata: Metadata = { title: 'Ingresar · TORRES ASOCIADOS' };
@@ -20,13 +22,25 @@ export default async function PaginaIngreso({ searchParams }: PropiedadesPaginaI
   const aviso = typeof motivo === 'string' ? AVISOS[motivo] : undefined;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-marino">Ingresar</h1>
-        <p className="text-sm text-apagado">Use el correo y la contraseña de su cuenta personal.</p>
-      </header>
-      {aviso === undefined ? null : <Alerta tono="info">{aviso}</Alerta>}
+    <>
+      <EncabezadoAcceso titulo="Bienvenido" descripcion="Ingrese con su correo y contraseña." />
+      {aviso === undefined ? null : (
+        <Aparecer>
+          <p
+            role="status"
+            className="flex items-center gap-2 rounded-xl border border-marino-claro/20 bg-marino/5 px-4 py-3 text-sm font-medium text-marino"
+          >
+            <Info aria-hidden="true" className="size-5 shrink-0" />
+            {aviso}
+          </p>
+        </Aparecer>
+      )}
       <FormularioIngreso />
-    </div>
+      <Aparecer>
+        <p className="text-center text-sm text-apagado">
+          ¿Olvidó su contraseña? Solicite a Gerencia General que la restablezca.
+        </p>
+      </Aparecer>
+    </>
   );
 }
