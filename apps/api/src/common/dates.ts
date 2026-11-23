@@ -44,6 +44,11 @@ export function aFechaIso(fecha: Date): string {
   return fecha.toISOString().slice(0, 10);
 }
 
+export function formatearFechaPeruana(fecha: string): string {
+  const [anio, mes, dia] = fecha.split('-');
+  return `${dia ?? ''}/${mes ?? ''}/${anio ?? ''}`;
+}
+
 export function aFechaIsoONula(fecha: Date | null): string | null {
   return fecha === null ? null : aFechaIso(fecha);
 }
