@@ -1,8 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import type { ContrasenaTemporal, UsuarioDetalle } from '@sige/types';
+import type { RestablecimientoContrasena, UsuarioDetalle } from '@sige/types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { HashContrasenas } from '../security/password-hasher.service';
-import { generarContrasenaTemporal } from '../security/tokens';
 import { CODIGO_ROL_GERENCIA } from '../access-control/effective-permissions.service';
 import { type ActorAuditoria, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
 import { SesionesService } from '../auth/sessions.service';
@@ -228,9 +227,11 @@ export class GestionUsuariosService {
 
   async restablecerContrasena(
     usuarioId: string,
-    motivo: string,
+    datos: RestablecimientoContrasena,
     actor: ActorAuditoria,
-  ): Promise<ContrasenaTemporal> {
+  ): Promise<UsuarioDetalle> {
+    const { contrasena, motivo } = datos;
+
     if (usuarioId === actor.usuarioId) {
       throw new BadRequestException({
         mensaje: 'Para cambiar su propia contraseña use la opción de Mi cuenta.',
@@ -247,13 +248,12 @@ export class GestionUsuariosService {
       });
     }
 
-    const contrasenaTemporal = generarContrasenaTemporal();
-    const hashContrasena = await this.hash.hashear(contrasenaTemporal);
+    const hashContrasena = await this.hash.hashear(contrasena);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.usuario.update({
         where: { id: usuarioId },
-        data: { hashContrasena, debeCambiarContrasena: true, intentosFallidos: 0, bloqueadoHasta: null },
+        data: { hashContrasena, intentosFallidos: 0, bloqueadoHasta: null },
       });
 
       const sesionesCerradas = await this.sesiones.revocarDeUsuario(
@@ -269,14 +269,14 @@ export class GestionUsuariosService {
           accion: 'MODIFICAR',
           entidad: 'usuario',
           entidadId: usuarioId,
-          despues: { contrasenaRestablecida: true, debeCambiarContrasena: true, sesionesCerradas },
+          despues: { contrasenaRestablecida: true, sesionesCerradas },
           motivo,
         },
         tx,
       );
     });
 
-    return { contrasenaTemporal };
+    return this.consulta.obtener(usuarioId);
   }
 
   private async asegurarOtraGerencia(usuarioId: string, db: ClienteBaseDatos): Promise<void> {
