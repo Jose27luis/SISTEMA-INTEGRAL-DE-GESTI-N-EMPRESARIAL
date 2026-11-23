@@ -10,7 +10,7 @@ Plataforma web para administrar, controlar y supervisar las operaciones de **TOR
 | **Tipo de sistema** | Aplicación web adaptable a computadora, tablet y celular |
 | **Versión del documento de requerimientos** | 1.0 (noviembre de 2026) |
 | **Stack** | Next.js 16 + NestJS 12 + Prisma 7 + PostgreSQL 16, monorepo pnpm + Turborepo, Docker Compose |
-| **Estado del proyecto** | 🛠️ Fase 0: base técnica terminada y publicada en `https://sige.torresasociados.pe`; pendientes los entregables de Gerencia ([avance](#103-fase-0-análisis-diseño-y-base-técnica)) |
+| **Estado del proyecto** | 🛠️ Fase 1, Sprint 1 terminado: autenticación con MFA, sesiones revocables, roles y permisos, auditoría inmutable ([12.8](#128-sprint-1-autenticación-roles-y-auditoría)). Fase 0 con entregables de Gerencia pendientes ([avance](#103-fase-0-análisis-diseño-y-base-técnica)) |
 
 ### Convenciones de este documento
 
@@ -618,7 +618,7 @@ Atributos de calidad del sistema, organizados según ISO/IEC 25010. Cada requeri
 | RNF-SEG-10 | Los archivos subidos se validan por tipo real (firma del contenido, no solo extensión), tamaño y lista blanca de formatos; se guardan con nombre aleatorio fuera de la raíz pública y solo se entregan a través de la API tras comprobar permisos. | Prueba de subida de archivo con extensión falsa. |
 | RNF-SEG-11 | Límite de peticiones en inicio de sesión y recuperación de contraseña (máximo 10 por minuto por IP). | Prueba de carga sobre el endpoint. |
 | RNF-SEG-12 | Los contenedores de la API, la web y la base de datos no exponen puertos fuera de `127.0.0.1`; solo nginx atiende Internet. | Revisión de `docker-compose.yml` y `ss -ltn`. |
-| RNF-SEG-13 | Los secretos (cadena de conexión, clave JWT, clave de cifrado) viven en `.env` fuera del repositorio y se validan con un esquema Zod al arrancar; si falta alguno, la API no arranca. | Arranque sin variable y comprobación del error. |
+| RNF-SEG-13 | Los secretos (cadena de conexión, clave de cifrado del secreto MFA) viven en `.env` fuera del repositorio y se validan con un esquema Zod al arrancar; si falta alguno, la API no arranca. | Arranque sin variable y comprobación del error. |
 | RNF-SEG-14 | El sistema no almacena credenciales de plataformas de clientes (ver RF-ACC-02). | Revisión del modelo de datos. |
 | RNF-SEG-15 | Dependencias sin vulnerabilidades altas o críticas conocidas al momento de cada entrega. | `pnpm audit` en la integración continua. |
 
@@ -769,10 +769,10 @@ Mismo stack que el sitio torresasociados.pe (`/var/www/torres`), para compartir 
 | Formularios | React Hook Form + Zod | Validación tipada compartida con `packages/types`. |
 | Tablas y gráficos | TanStack Table + Recharts | Listados paginados en el servidor y tablero gerencial. |
 | Backend | NestJS 12 (Express) | Módulos por dominio, guardias, inyección de dependencias. |
-| Validación API | class-validator + class-transformer, Zod para el entorno | Igual que torresasociados.pe. |
+| Validación API | Esquemas Zod de `packages/types` mediante el pipe `ValidacionZod`, con mensajes en español (`z.locales.es()`) | Un solo contrato para web y API, sin clases DTO duplicadas. |
 | ORM | Prisma 7 con `@prisma/adapter-pg` | Fuente de verdad del modelo, migraciones versionadas. |
 | Base de datos | PostgreSQL 16 | Transacciones, `citext`, `unaccent`, búsqueda de texto completo, disparadores para auditoría. |
-| Autenticación | `@nestjs/jwt` + sesiones en base de datos + TOTP (`otplib`) + Argon2id | Tokens revocables y MFA. |
+| Autenticación | Token de sesión opaco (32 bytes aleatorios, solo su SHA-256 en la base) + Argon2id (`@node-rs/argon2`) + TOTP (`otplib`) + límite de intentos (`@nestjs/throttler`) | Revocación inmediata sin listas negras y MFA. |
 | Procesos programados | `@nestjs/schedule` en contenedor `worker` + bloqueo `pg_advisory_lock` | Sin dependencias extra (Redis no es necesario). |
 | Tiempo real | Server-Sent Events desde NestJS | Notificaciones unidireccionales, atraviesa nginx sin WebSocket. |
 | Reportes | ExcelJS (xlsx) + pdfmake (pdf) | Generación en el servidor con permisos aplicados. |
@@ -1137,7 +1137,7 @@ sequenceDiagram
     participant D as PostgreSQL
 
     U->>W: correo y contraseña
-    W->>A: POST /auth/login
+    W->>A: POST /auth/ingreso (con x-cliente-ip y x-agente-usuario)
     A->>D: buscar usuario activo
     A->>A: verificar Argon2id y bloqueo por intentos
     alt credenciales inválidas
@@ -1146,22 +1146,24 @@ sequenceDiagram
         W-->>U: mensaje genérico
     else requiere MFA
         A->>D: crear desafío MFA de 5 minutos
-        A-->>W: 200 { requiereMfa, desafioId }
-        U->>W: código TOTP de 6 dígitos
-        W->>A: POST /auth/mfa { desafioId, codigo }
-        A->>A: verificar TOTP con ventana ±1
+        A-->>W: 200 { estado: MFA_REQUERIDO, desafioId }
+        W->>W: guardar desafioId en cookie HttpOnly de 5 minutos
+        U->>W: código TOTP o código de recuperación
+        W->>A: POST /auth/mfa/verificacion { desafioId, codigo }
+        A->>A: verificar TOTP con ventana ±30 s
     end
-    A->>D: crear Sesion { id, usuarioId, ip, agente, expiraEn }
+    A->>D: crear Sesion { hashToken = SHA-256(token), ip, agente, expiraEn }
     A->>D: registrar inicio de sesión en auditoría
-    A-->>W: JWT firmado { sub, sid } en cookie HttpOnly
+    A-->>W: { estado: SESION_INICIADA, token, expiraEn }
+    W->>W: cookie sige_sesion HttpOnly, Secure, SameSite=Lax
     W-->>U: redirige a /inicio
 
-    Note over W,A: En cada petición posterior
-    W->>A: GET /... con cookie
-    A->>D: ¿Sesion sid vigente y no revocada?
-    alt revocada o expirada
+    Note over W,A: En cada petición posterior (desde el servidor de Next.js)
+    W->>A: Authorization: Bearer token
+    A->>D: ¿Sesion vigente, no revocada y activa en los últimos 30 min?
+    alt revocada, expirada o inactiva
         A-->>W: 401
-        W-->>U: redirige a /ingresar
+        W-->>U: /sesion-expirada borra la cookie y redirige a /ingresar
     else vigente
         A->>D: actualizar ultimoUso (como máximo una vez por minuto)
         A-->>W: datos
@@ -2672,7 +2674,9 @@ Cubre los entregables previos a la programación: diseño de pantallas y prototi
 
 **Objetivo:** demostrar el circuito completo de asignación, avance, evidencia, revisión, observación, aprobación y consulta de historial desde el panel de Gerencia.
 
-#### Sprint 1 · Autenticación, roles y auditoría
+#### Sprint 1 · Autenticación, roles y auditoría ✅
+
+Terminado el 23/11/2026, antes de la aprobación formal de la Fase 0 por decisión del equipo; detalle y pendientes en [12.8](#128-sprint-1-autenticación-roles-y-auditoría).
 
 | Historia | Requerimientos |
 |---|---|
@@ -2974,11 +2978,11 @@ Toda la documentación del proyecto (requerimientos, arquitectura, modelo de dat
 
 | Paquete | Ruta | Contenido actual |
 |---|---|---|
-| `@sige/api` | `apps/api` | NestJS 12, entorno validado con Zod, Prisma 7 con `@prisma/adapter-pg`, endpoint `GET /health` que comprueba la base de datos (200 si responde, 503 si no). |
-| `@sige/web` | `apps/web` | Next.js 16 con Tailwind CSS 4; página inicial que consulta `/health` desde el servidor y muestra el estado de la API y la base de datos. |
-| `@sige/types` | `packages/types` | Contratos compartidos como esquemas Zod (`esquemaEstadoSalud`) y sus tipos inferidos. |
-| `@sige/ui` | `packages/ui` | Tema institucional (`theme.css`: marino, dorado, verde y neutros) y la utilidad `cn`. |
-| `@sige/config` | `packages/config` | Configuración ESLint compartida: `typescript-eslint` estricto con tipos, `any` y `@ts-ignore` prohibidos. |
+| `@sige/api` | `apps/api` | NestJS 12, Prisma 7, módulos `security`, `audit`, `access-control`, `auth`, `users` y `health`; pruebas con Vitest junto al código (`*.spec.ts`, excluidas del build). Ver [12.8](#128-sprint-1-autenticación-roles-y-auditoría). |
+| `@sige/web` | `apps/web` | Next.js 16 con Tailwind CSS 4: ingreso, verificación MFA, pantallas obligatorias, panel con menú por permisos, mi cuenta, usuarios, roles y auditoría. `/estado` muestra la salud de API y base de datos. |
+| `@sige/types` | `packages/types` | Contratos compartidos como esquemas Zod (autenticación, usuarios, roles, permisos, auditoría, errores) y sus tipos inferidos. |
+| `@sige/ui` | `packages/ui` | Tema institucional (`theme.css`), la utilidad `cn` y componentes accesibles: `Boton`, `Campo`, `AreaTexto`, `Seleccion`, `Casilla`, `Alerta`, `Insignia`, `Tarjeta`. |
+| `@sige/config` | `packages/config` | Configuración ESLint compartida: `typescript-eslint` estricto con tipos, `any` y `@ts-ignore` prohibidos, y regla que prohíbe el atributo `placeholder` en JSX. |
 
 Los códigos de color de `packages/ui/src/theme.css` son provisionales hasta que Gerencia entregue la guía visual oficial (decisión D-12).
 
@@ -3005,10 +3009,20 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 Verificación del monorepo (typecheck, lint y build) dentro de un contenedor Node 22:
 
 ```bash
-docker run --rm -v "$PWD":/app -w /app node:22-alpine sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm build"
+docker run --rm -v "$PWD":/app -w /app node:22-alpine sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm test && pnpm build"
 ```
 
-El `.env` nunca se versiona; `POSTGRES_PASSWORD` debe reemplazarse por una clave fuerte antes del primer arranque.
+El `.env` nunca se versiona. Antes del primer arranque se reemplazan `POSTGRES_PASSWORD` por una clave fuerte y `MFA_CLAVE_CIFRADO` por una clave generada con `openssl rand -hex 32`. Perder `MFA_CLAVE_CIFRADO` obliga a restablecer la verificación en dos pasos de todos los usuarios, por lo que debe respaldarse junto con el `.env`.
+
+Variables de sesión opcionales: `SESION_DURACION_HORAS` (por defecto 8) y `SESION_INACTIVIDAD_MINUTOS` (por defecto 30).
+
+Primer usuario de Gerencia (no existe alta de usuarios desde la web hasta el módulo de Personal del Sprint 2):
+
+```bash
+docker compose exec api node dist/scripts/create-user.js --nombre "Nombre Apellido" --correo correo@dominio.pe --rol GERENCIA
+```
+
+El comando muestra una contraseña temporal una sola vez; en el primer ingreso el sistema obliga a cambiarla y, por el rol, a configurar la verificación en dos pasos.
 
 ### 12.6 Publicación en el servidor
 
@@ -3037,12 +3051,66 @@ El flujo `.github/workflows/ci.yml` se ejecuta en cada push y pull request a `ma
 
 | Trabajo | Pasos |
 |---|---|
-| `verificar` | Node según `.nvmrc`, pnpm según `packageManager`, `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm audit --audit-level high` y `pnpm build`. |
+| `verificar` | Node según `.nvmrc`, pnpm según `packageManager`, `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm audit --audit-level high` y `pnpm build`. |
 | `imagenes` | Construye las imágenes Docker `runtime` de `api` y `web` (sin publicarlas), con caché de GitHub Actions. Solo corre si `verificar` pasa. |
 
-Las pruebas unitarias, de integración y e2e (sección 10.11) se agregan a este flujo en la Fase 1, junto con el primer código de negocio.
+Las pruebas de integración contra PostgreSQL y las e2e con Playwright (sección 10.11) quedan pendientes; en el Sprint 1 el flujo completo se verificó manualmente sobre un stack desechable (ver 12.8).
 
 **Override de seguridad:** `pnpm-workspace.yaml` fuerza `effect` a `^3.22.1` porque Prisma 7.10 arrastra una versión vulnerable a ReDoS (GHSA-7589-6fvf-x4pw). Se retira cuando Prisma publique una versión que ya dependa de la corregida.
+
+### 12.8 Sprint 1: autenticación, roles y auditoría
+
+**Modelo de datos** (migración `20261123180000_identidad_y_acceso`): `usuarios`, `roles`, `permisos`, `usuarios_roles`, `roles_permisos`, `sesiones`, `desafios_mfa`, `codigos_recuperacion` y `auditoria`. Ninguna operación borra filas: las asignaciones de roles y permisos se retiran con `retirado_en`, las sesiones se revocan con `revocada_en` y los códigos se invalidan con `invalidado_en`. Índices únicos parciales impiden asignaciones vigentes duplicadas. Un disparador rechaza `UPDATE`, `DELETE` y `TRUNCATE` sobre `auditoria`. La migración siembra los 6 permisos del sprint y los 5 roles base; Gerencia recibe todos los permisos.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `POST /auth/ingreso` | Público, 10 por minuto por IP | Correo y contraseña; responde `SESION_INICIADA` o `MFA_REQUERIDO`. |
+| `POST /auth/mfa/verificacion` | Público, 10 por minuto por IP | Código TOTP o de recuperación contra un desafío de 5 minutos y 5 intentos. |
+| `GET /auth/perfil` | Sesión, aun con pendientes | Usuario, roles, permisos, alcance y pendientes (`CAMBIAR_CONTRASENA`, `CONFIGURAR_MFA`). |
+| `POST /auth/contrasena` | Sesión, aun con pendientes | Cambio de contraseña; cierra las demás sesiones del usuario. |
+| `POST /auth/mfa/configuracion` · `POST /auth/mfa/activacion` | Sesión, aun con pendientes | QR y secreto TOTP; activación con 10 códigos de recuperación. |
+| `GET /auth/sesiones` · `POST /auth/sesiones/:id/cierre` · `POST /auth/salida` | Sesión | Sesiones propias abiertas, cierre remoto y cierre de la actual. |
+| `GET /usuarios` · `GET /usuarios/:id` | `usuario:ver` | Listado y detalle con sesiones abiertas. |
+| `PUT /usuarios/:id/roles` | `usuario:gestionar` | Asignación de roles. |
+| `POST /usuarios/:id/desactivacion` · `/activacion` · `/restablecimiento-mfa` | `usuario:gestionar` | Con motivo obligatorio. |
+| `POST /usuarios/:id/restablecimiento-contrasena` | `usuario:gestionar` | Genera una contraseña temporal que se muestra una sola vez, obliga a cambiarla, quita el bloqueo y cierra las sesiones. |
+| `POST /usuarios/:id/revocacion-sesiones` | `sesion:revocar` | Con motivo obligatorio. |
+| `GET /roles` · `GET /roles/:id` · `GET /permisos` | `rol:ver` | Roles con permisos y usuarios activos; catálogo de permisos. |
+| `POST /roles` · `PUT /roles/:id` · `POST /roles/:id/desactivacion` · `/activacion` | `rol:gestionar` | Alta, edición y estado de roles. |
+| `GET /auditoria` | `auditoria:ver` | Filtros por usuario, acción, entidad y rango de fechas en hora de Lima; 50 registros por página. |
+
+**Reglas implementadas**
+
+- Bloqueo de 15 minutos tras 5 contraseñas incorrectas seguidas; el mensaje indica la hora de desbloqueo en hora de Lima.
+- Usuario inexistente y contraseña incorrecta devuelven el mismo mensaje y tardan lo mismo (verificación Argon2 simulada).
+- Sesión de 8 horas como máximo y cierre automático tras 30 minutos sin actividad.
+- Mientras haya pendientes, la API solo atiende los endpoints de cuenta y la web redirige a la pantalla correspondiente.
+- Cada acceso denegado por permisos queda en auditoría como `PERMISO_DENEGADO` con método y ruta.
+- Siempre debe quedar al menos un usuario activo con el rol Gerencia General; nadie puede desactivar su propia cuenta.
+- El rol Gerencia General conserva todos los permisos y la verificación en dos pasos obligatoria; los roles del sistema no se desactivan; un rol con usuarios activos no se desactiva.
+- Política de contraseñas: de 12 a 128 caracteres; rechaza secuencias predecibles (`password`, `123456`, `qwerty`, el nombre de la empresa), el nombre y el usuario de correo de la persona, y la repetición de un solo carácter.
+- Las acciones irreversibles en la web piden motivo y una casilla de confirmación que explica la consecuencia.
+
+**Verificación realizada:** typecheck, lint y 29 pruebas unitarias (política de contraseñas, cifrado AES-256-GCM, tokens, TOTP, bloqueo, Argon2id y pendientes). El flujo completo se probó contra un stack desechable con PostgreSQL real. Se cubrieron:
+
+- Primer ingreso, cambio de contraseña y activación de MFA.
+- Ingreso con TOTP, con código de recuperación y su reutilización rechazada.
+- Permisos denegados y revocación de sesiones.
+- Bloqueo tras 5 intentos, límite de 10 intentos por minuto y protecciones de Gerencia.
+- Gestión de roles y filtros de auditoría.
+- `UPDATE`, `DELETE` y `TRUNCATE` rechazados directamente en PostgreSQL.
+- Todas las páginas web renderizadas con datos reales y el formulario de ingreso enviado sin JavaScript.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| RF-AUT-07 Recuperación de contraseña por correo | Requiere SMTP (RF-INT-01, Fase 5). Mientras tanto, Gerencia genera una contraseña temporal desde el detalle del usuario. |
+| RF-AUD-04 Exportación de la auditoría | Se implementa con la exportación a Excel y PDF del Sprint 4 (RF-REP-01). |
+| RNF-SEG-02 Lista de contraseñas comunes | Se aplica la lista de secuencias predecibles descrita arriba; una lista amplia de contraseñas filtradas queda por definir. |
+| Pruebas e2e automatizadas | Pendientes de incorporar Playwright a la integración continua. |
 
 ---
 
