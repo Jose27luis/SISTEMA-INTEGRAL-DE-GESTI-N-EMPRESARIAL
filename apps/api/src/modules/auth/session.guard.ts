@@ -50,6 +50,7 @@ export class GuardiaSesion implements CanActivate {
       sesionId: sesion.sesionId,
       permisos: acceso.permisos,
       alcanceGlobal: acceso.alcanceGlobal,
+      alcance: acceso.alcance,
       pendientes: acceso.pendientes,
     };
 
