@@ -19,7 +19,7 @@ env:
 
 jobs:
   verificar:
-    name: Typecheck, lint, auditoría y build
+    name: Typecheck, lint, pruebas, auditoría y build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -40,6 +40,9 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Pruebas
+        run: pnpm test
 
       - name: Auditoría de dependencias
         run: pnpm audit --audit-level high
