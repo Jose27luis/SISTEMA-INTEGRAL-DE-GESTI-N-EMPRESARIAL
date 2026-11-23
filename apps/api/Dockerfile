@@ -46,7 +46,9 @@ ENV NODE_ENV=production
 WORKDIR /app
 RUN apk add --no-cache openssl \
     && addgroup -S sige \
-    && adduser -S sige -G sige
+    && adduser -S sige -G sige \
+    && mkdir -p /app/almacen \
+    && chown sige:sige /app/almacen
 COPY --from=prod-deps --chown=sige:sige /app/package.json ./package.json
 COPY --from=prod-deps --chown=sige:sige /app/node_modules ./node_modules
 COPY --from=prod-deps --chown=sige:sige /app/apps/api/node_modules ./apps/api/node_modules
