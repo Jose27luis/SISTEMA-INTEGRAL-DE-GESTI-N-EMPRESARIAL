@@ -1,7 +1,9 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
 import {
   type AsignacionRoles,
+  type DesactivacionUsuario,
   esquemaAsignacionRoles,
+  esquemaDesactivacionUsuario,
   esquemaMotivo,
   esquemaRestablecimientoContrasena,
   type Motivo,
@@ -55,11 +57,11 @@ export class UsuariosController {
   @RequierePermiso('usuario:gestionar')
   desactivar(
     @Param('id', validarId) id: string,
-    @Body(validarMotivo) datos: Motivo,
+    @Body(new ValidacionZod(esquemaDesactivacionUsuario)) datos: DesactivacionUsuario,
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Cliente() cliente: ContextoCliente,
   ): Promise<UsuarioDetalle> {
-    return this.gestion.desactivar(id, datos.motivo, actorDesde(usuario, cliente));
+    return this.gestion.desactivar(id, datos.motivo, actorDesde(usuario, cliente), undefined, datos.reasignarAId);
   }
 
   @Post(':id/activacion')
