@@ -1,8 +1,10 @@
-import { Alerta } from '@sige/ui/components';
+import { TriangleAlert, Smartphone } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { Aparecer } from '@/components/auth/appear';
+import { EncabezadoAcceso } from '@/components/auth-heading';
 import { obtenerPerfil } from '@/lib/profile';
 import { ConfiguradorMfa } from './mfa-setup';
 
@@ -11,10 +13,6 @@ export const metadata: Metadata = { title: 'Verificación en dos pasos · TORRES
 export default async function PaginaConfigurarMfa(): Promise<ReactNode> {
   const perfil = await obtenerPerfil();
 
-  if (perfil.pendientes.includes('CAMBIAR_CONTRASENA')) {
-    redirect('/cambiar-contrasena');
-  }
-
   if (perfil.usuario.mfaActivo) {
     redirect('/mi-cuenta');
   }
@@ -22,22 +20,28 @@ export default async function PaginaConfigurarMfa(): Promise<ReactNode> {
   const obligatorio = perfil.pendientes.includes('CONFIGURAR_MFA');
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-marino">Verificación en dos pasos</h1>
-        <p className="text-sm text-apagado">{perfil.usuario.correo}</p>
-      </header>
+    <>
+      <EncabezadoAcceso
+        icono={<Smartphone aria-hidden="true" className="size-6" />}
+        titulo="Verificación en dos pasos"
+        descripcion={perfil.usuario.correo}
+      />
       {obligatorio ? (
-        <Alerta tono="aviso">
-          Su rol requiere verificación en dos pasos. Configúrela para acceder al sistema.
-        </Alerta>
+        <Aparecer>
+          <p className="flex items-start gap-2 rounded-xl border border-dorado/50 bg-dorado-suave px-4 py-3 text-sm font-medium text-tinta">
+            <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-dorado-oscuro" />
+            Su rol requiere verificación en dos pasos. Configúrela una sola vez para acceder al sistema.
+          </p>
+        </Aparecer>
       ) : null}
       <ConfiguradorMfa />
       {obligatorio ? null : (
-        <Link href="/mi-cuenta" className="text-center text-sm font-medium text-marino-claro hover:underline">
-          Volver a mi cuenta
-        </Link>
+        <Aparecer className="text-center">
+          <Link href="/mi-cuenta" className="text-sm font-semibold text-marino-claro hover:underline">
+            ← Volver a mi cuenta
+          </Link>
+        </Aparecer>
       )}
-    </div>
+    </>
   );
 }
