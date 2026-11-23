@@ -7,6 +7,9 @@ const configuracion: NextConfig = {
   transpilePackages: ['@sige/ui'],
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    serverActions: { bodySizeLimit: '6mb' },
+  },
 };
 
 export default configuracion;
