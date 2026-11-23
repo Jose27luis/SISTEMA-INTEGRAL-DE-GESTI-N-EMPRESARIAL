@@ -10,7 +10,7 @@ Plataforma web para administrar, controlar y supervisar las operaciones de **TOR
 | **Tipo de sistema** | Aplicación web adaptable a computadora, tablet y celular |
 | **Versión del documento de requerimientos** | 1.0 (noviembre de 2026) |
 | **Stack** | Next.js 16 + NestJS 12 + Prisma 7 + PostgreSQL 16, monorepo pnpm + Turborepo, Docker Compose |
-| **Estado del proyecto** | 🛠️ Fase 1, Sprint 1 terminado: autenticación con MFA, sesiones revocables, roles y permisos, auditoría inmutable ([12.8](#128-sprint-1-autenticación-roles-y-auditoría)). Fase 0 con entregables de Gerencia pendientes ([avance](#103-fase-0-análisis-diseño-y-base-técnica)) |
+| **Estado del proyecto** | 🛠️ Fase 1: Sprint 1 (acceso, roles y auditoría, [12.8](#128-sprint-1-autenticación-roles-y-auditoría)) y Sprint 2 (personal, clientes y asignaciones, [12.9](#129-sprint-2-personal-clientes-y-asignaciones)) terminados. Fase 0 con entregables de Gerencia pendientes ([avance](#103-fase-0-análisis-diseño-y-base-técnica)) |
 
 ### Convenciones de este documento
 
@@ -118,6 +118,8 @@ Leyenda: **T** total · **A** solo clientes o registros asignados · **P** propi
 | Configuración | T | — | — | — | — |
 
 La matriz es la configuración inicial; Gerencia puede ajustarla (RF-ROL-02).
+
+**Visibilidad de clientes implementada (Sprint 2):** los roles con alcance global (Gerencia) ven todos los clientes; los demás solo ven los clientes a los que están asignados en el equipo del cliente. Por eso, en la configuración inicial, Administración y Comercial ven únicamente sus clientes asignados (no la lectura total que indica la tabla); para darles vista total basta con asignarlos al equipo o cambiar el alcance de su rol.
 
 ---
 
@@ -2689,7 +2691,9 @@ Terminado el 23/11/2026, antes de la aprobación formal de la Fase 0 por decisi�
 
 Tareas técnicas: `SessionGuard`, `PermissionGuard`, siembra de roles y permisos, tabla de auditoría con disparador de inmutabilidad, `/health`, cabeceras de seguridad en nginx.
 
-#### Sprint 2 · Personal, clientes y asignaciones
+#### Sprint 2 · Personal, clientes y asignaciones ✅
+
+Terminado el 23/11/2026; detalle y pendientes en [12.9](#129-sprint-2-personal-clientes-y-asignaciones).
 
 | Historia | Requerimientos |
 |---|---|
@@ -3110,6 +3114,58 @@ Las pruebas de integración contra PostgreSQL y las e2e con Playwright (sección
 | RF-AUT-07 Recuperación de contraseña por correo | Requiere SMTP (RF-INT-01, Fase 5). Mientras tanto, Gerencia asigna una nueva contraseña desde el detalle del usuario. |
 | RF-AUD-04 Exportación de la auditoría | Se implementa con la exportación a Excel y PDF del Sprint 4 (RF-REP-01). |
 | Pruebas e2e automatizadas | Pendientes de incorporar Playwright a la integración continua. |
+
+### 12.9 Sprint 2: personal, clientes y asignaciones
+
+**Modelo de datos** (migración `20261124140000_personal_y_clientes`): `areas`, `cargos`, `tipos_vinculo`, `regimenes_tributarios`, `trabajadores`, `clientes`, `contactos_cliente` y `asignaciones_cliente`. Restricciones en la base: todo cliente tiene RUC o DNI, formato de RUC (prefijo 10, 15, 16, 17 o 20 y 11 dígitos) y de DNI, RUC, DNI y nombres de catálogo únicos (sin distinguir mayúsculas), y una sola asignación vigente por usuario y cliente. Se siembran los regímenes Nuevo RUS, Régimen Especial de Renta, Régimen MYPE Tributario y Régimen General, y los permisos `personal:ver`, `personal:gestionar`, `cliente:ver`, `cliente:gestionar`, `cliente:asignar` y `catalogo:gestionar` repartidos según la matriz de la sección 3. Las áreas, cargos y tipos de vínculo no se siembran: los define Gerencia en Catálogos.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `GET /catalogos/:tipo` | Sesión | `areas`, `cargos`, `tipos-vinculo` o `regimenes-tributarios`, con cantidad de usos. |
+| `POST /catalogos/:tipo` · `PUT /catalogos/:tipo/:id` · `POST .../activacion` · `/desactivacion` | `catalogo:gestionar` | Alta, cambio de nombre y estado; nunca se eliminan. |
+| `GET /personal?estado=` · `GET /personal/:id` | `personal:ver` | Fichas del personal. |
+| `GET /personal/usuarios-sin-ficha` | `personal:gestionar` | Cuentas existentes que todavía no tienen ficha. |
+| `POST /personal` | `personal:gestionar` | Ficha más cuenta nueva (correo, contraseña definida por Gerencia y roles) o vínculo con una cuenta existente sin ficha. |
+| `PUT /personal/:id` · `POST /personal/:id/cese` · `/reactivacion` | `personal:gestionar` | Edición, baja con fecha de cese y motivo, y reactivación. |
+| `GET /clientes?busqueda=&estado=&pagina=` | `cliente:ver` | 25 por página; búsqueda por razón social, RUC o DNI; solo clientes visibles para el usuario. |
+| `GET /clientes/:id` · `GET /clientes/:id/historial` | `cliente:ver` + asignación | Expediente con contactos y equipo; historial desde la auditoría. |
+| `POST /clientes` · `PUT /clientes/:id` · `POST /clientes/:id/estado` | `cliente:gestionar` | Alta, edición y cambio de estado (Activo, Suspendido, Inactivo) con motivo. |
+| `POST /clientes/:id/contactos` · `PUT .../contactos/:contactoId` · `POST .../desactivacion` | `cliente:gestionar` | Contactos; marcar uno como principal desmarca al anterior. |
+| `POST /clientes/:id/asignaciones` · `POST .../asignaciones/:asignacionId/retiro` | `cliente:asignar` | Equipo del cliente con rol (Responsable, Apoyo, Revisor, Consulta). |
+| `GET /clientes/importacion/plantilla` · `POST /clientes/importacion` | `cliente:gestionar` | Plantilla Excel y carga de hasta 2000 filas y 5 MB. |
+
+**Reglas implementadas**
+
+- RUC validado con el dígito verificador de SUNAT tanto en la web como en la API; una persona jurídica debe tener RUC.
+- Acceso a clientes: quien no tiene alcance global y no está asignado recibe 403 y el intento queda en la auditoría como `PERMISO_DENEGADO`; los listados y búsquedas solo devuelven clientes visibles.
+- El responsable de un cliente queda asignado automáticamente a su equipo; quien registra un cliente sin alcance global también queda asignado.
+- La baja de un trabajador (o la desactivación de su usuario) desactiva la cuenta, cierra sus sesiones y retira sus asignaciones a clientes, conservando todo su historial; la fecha de cese no puede ser anterior a la de incorporación. RF-PER-03 exige además reasignar sus tareas abiertas: se agrega cuando exista el módulo de tareas (Sprint 3).
+- La ficha y la cuenta se mantienen sincronizadas: el nombre del usuario se actualiza con la ficha.
+- Importación: cada fila se valida por separado; las válidas se registran y las rechazadas se informan con el número de fila y los motivos (RUC inválido, documento repetido en el archivo o ya registrado, régimen inexistente, fecha inválida, correo inválido). La fecha de incorporación vacía toma la fecha de importación. Solo se aceptan archivos .xlsx reales (se verifica la firma del archivo).
+- Toda acción sobre un cliente, sus contactos y su equipo queda en su historial.
+
+**Verificación realizada:** typecheck, lint, 32 pruebas unitarias (se suman lectura de celdas de Excel y validación de RUC y DNI) y build. Contra un stack desechable con PostgreSQL real se probaron:
+
+- Catálogos, con rechazo de nombres duplicados aunque cambien las mayúsculas.
+- Alta de trabajador con cuenta nueva y su ingreso con la contraseña definida por Gerencia.
+- DNI repetido rechazado.
+- RUC con dígito errado, persona jurídica sin RUC y RUC duplicado rechazados.
+- Visibilidad por asignación: 0 clientes sin asignar, 1 tras la asignación y 403 al cliente no asignado o al intentar editar.
+- Contacto principal único y suspensión del cliente.
+- Baja que cierra la sesión y retira al trabajador de sus clientes, y reactivación.
+- Importación con 2 filas válidas y 4 rechazadas con sus motivos, y archivo que no es Excel rechazado.
+- Todas las páginas web renderizadas con datos reales y la plantilla descargada desde la web.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| RF-PER-03 Reasignar tareas abiertas en la baja | Se agrega con el módulo de tareas (Sprint 3). |
+| RF-CLI-07 Pestañas Comercial, Operativa, Tareas, Documentos y Accesos del expediente | Se agregan con sus módulos (Sprints 3, 5, 6, 7 y 8). |
+| RF-CFG-01 Datos de la empresa y RF-CFG-03 Parámetros | Pendientes; los parámetros de sesión se configuran hoy por variables de entorno. |
+| Aviso de `pnpm audit` (moderado) | `exceljs` depende de `uuid` < 11 (GHSA-w5hq-g745-h8pq), que afecta solo a las funciones v3, v5 y v6 con buffer; ExcelJS usa `v4`, por lo que no aplica. Se revisa al actualizar ExcelJS. |
 
 ---
 
