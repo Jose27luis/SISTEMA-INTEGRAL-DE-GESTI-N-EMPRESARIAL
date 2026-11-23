@@ -7,6 +7,8 @@ import { CODIGO_ROL_GERENCIA } from '../access-control/effective-permissions.ser
 import { ContinuidadGerenciaService } from '../access-control/management-continuity.service';
 import { type ActorAuditoria, AuditoriaService } from '../audit/audit.service';
 import { SesionesService } from '../auth/sessions.service';
+import { NotificacionesService } from '../notifications/notifications.service';
+import { ReasignacionTareasService } from '../tasks/task-reassignment.service';
 import { ConsultaUsuariosService } from './users-query.service';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class GestionUsuariosService {
     private readonly consulta: ConsultaUsuariosService,
     private readonly hash: HashContrasenas,
     private readonly continuidad: ContinuidadGerenciaService,
+    private readonly reasignacion: ReasignacionTareasService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   async asignarRoles(
@@ -89,6 +93,7 @@ export class GestionUsuariosService {
     motivo: string,
     actor: ActorAuditoria,
     fechaCese: string = fechaHoyEnLima(),
+    reasignarAId: string | null = null,
   ): Promise<UsuarioDetalle> {
     if (usuarioId === actor.usuarioId) {
       throw new BadRequestException({ mensaje: 'No puede desactivar su propia cuenta.', errores: [] });
@@ -100,7 +105,22 @@ export class GestionUsuariosService {
       return usuario;
     }
 
+    const tareasAbiertas = await this.reasignacion.contarAbiertas(usuarioId);
+
+    if (tareasAbiertas > 0 && reasignarAId === null) {
+      throw new ConflictException({
+        mensaje: `Tiene ${String(tareasAbiertas)} ${tareasAbiertas === 1 ? 'tarea abierta' : 'tareas abiertas'} como responsable o revisor. Indique a quién ${tareasAbiertas === 1 ? 'reasignarla' : 'reasignarlas'}.`,
+        errores: [{ campo: 'reasignarAId', mensaje: 'Seleccione quién recibirá sus tareas.' }],
+      });
+    }
+
+    const notificados: string[] = [];
+
     await this.prisma.$transaction(async (tx) => {
+      if (tareasAbiertas > 0 && reasignarAId !== null) {
+        notificados.push(...(await this.reasignacion.reasignar(usuarioId, reasignarAId, actor, tx)).notificados);
+      }
+
       if (usuario.roles.some(({ codigo }) => codigo === CODIGO_ROL_GERENCIA)) {
         await this.continuidad.asegurarOtraGerencia(usuarioId, tx);
       }
@@ -137,6 +157,8 @@ export class GestionUsuariosService {
             fechaCese,
             sesionesCerradas,
             clientesRetirados: asignaciones.count,
+            tareasReasignadas: tareasAbiertas,
+            reasignadasA: reasignarAId,
           },
           motivo,
         },
@@ -144,6 +166,7 @@ export class GestionUsuariosService {
       );
     });
 
+    await this.notificaciones.publicar(notificados);
     return this.consulta.obtener(usuarioId);
   }
 
