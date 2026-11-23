@@ -39,3 +39,45 @@ export function leerTexto(datos: FormData, campo: string): string {
 export function leerLista(datos: FormData, campo: string): string[] {
   return datos.getAll(campo).filter((valor): valor is string => typeof valor === 'string');
 }
+
+export function leerOpcional(datos: FormData, campo: string): string | null {
+  const valor = leerTexto(datos, campo).trim();
+  return valor === '' ? null : valor;
+}
+
+export function leerCasilla(datos: FormData, campo: string): boolean {
+  return datos.get(campo) === 'on';
+}
+
+export function valoresDeFormulario(datos: FormData): Partial<Record<string, string>> {
+  const valores: Partial<Record<string, string>> = {};
+
+  datos.forEach((valor, clave) => {
+    if (typeof valor === 'string' && !clave.startsWith('$') && clave !== 'contrasena') {
+      valores[clave] = valor;
+    }
+  });
+
+  return valores;
+}
+
+interface ProblemaValidacion {
+  path: readonly PropertyKey[];
+  message: string;
+}
+
+export function estadoDesdeProblemas(
+  problemas: readonly ProblemaValidacion[],
+  valores: Partial<Record<string, string>>,
+): EstadoFormulario {
+  return estadoConError(
+    {
+      mensaje: 'Revise los datos ingresados.',
+      errores: problemas.map((problema) => ({
+        campo: problema.path.map(String).at(-1) ?? '',
+        mensaje: problema.message,
+      })),
+    },
+    valores,
+  );
+}
