@@ -2,10 +2,13 @@
 
 import { cn } from '@sige/ui/cn';
 import {
+  Bell,
   Building2,
   CircleUserRound,
+  ClipboardCheck,
   House,
   IdCard,
+  ListChecks,
   ListTree,
   type LucideIcon,
   ScrollText,
@@ -20,6 +23,9 @@ import type { GrupoNavegacion, IconoNavegacion } from '@/lib/navigation';
 const ICONOS: Record<IconoNavegacion, LucideIcon> = {
   inicio: House,
   cuenta: CircleUserRound,
+  'mi-trabajo': ClipboardCheck,
+  tareas: ListChecks,
+  notificaciones: Bell,
   clientes: Building2,
   personal: IdCard,
   usuarios: Users,
