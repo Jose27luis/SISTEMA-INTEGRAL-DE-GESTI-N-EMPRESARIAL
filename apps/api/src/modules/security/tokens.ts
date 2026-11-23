@@ -22,7 +22,3 @@ export function generarCodigoRecuperacion(): string {
 
   return `${codigo.slice(0, 4)}-${codigo.slice(4)}`;
 }
-
-export function generarContrasenaTemporal(): string {
-  return randomBytes(18).toString('base64url');
-}
