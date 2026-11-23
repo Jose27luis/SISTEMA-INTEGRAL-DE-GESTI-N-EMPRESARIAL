@@ -173,6 +173,16 @@ export class ConsultaClientesService {
     }));
   }
 
+  async opciones(usuario: UsuarioAutenticado): Promise<{ id: string; nombre: string }[]> {
+    const clientes = await this.prisma.cliente.findMany({
+      where: { AND: [this.acceso.filtroVisible(usuario), { estado: { not: 'INACTIVO' } }] },
+      orderBy: { razonSocial: 'asc' },
+      select: { id: true, razonSocial: true },
+    });
+
+    return clientes.map(({ id, razonSocial }) => ({ id, nombre: razonSocial }));
+  }
+
   usuariosAsignables(): Promise<UsuarioAsignable[]> {
     return this.prisma.usuario.findMany({
       where: { activo: true },
