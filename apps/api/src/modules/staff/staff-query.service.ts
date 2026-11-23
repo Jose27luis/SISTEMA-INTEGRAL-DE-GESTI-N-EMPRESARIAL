@@ -6,6 +6,7 @@ import type {
   TrabajadorResumen,
   UsuarioSinFicha,
 } from '@sige/types';
+import { ESTADOS_CERRADOS } from '@sige/types';
 import { aFechaIso, aFechaIsoONula } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -44,7 +45,7 @@ function aResumen(trabajador: TrabajadorConRelaciones): TrabajadorResumen {
   };
 }
 
-function aDetalle(trabajador: TrabajadorConRelaciones): TrabajadorDetalle {
+function aDetalle(trabajador: TrabajadorConRelaciones, tareasAbiertas: number): TrabajadorDetalle {
   return {
     ...aResumen(trabajador),
     tipoVinculo: trabajador.tipoVinculo,
@@ -61,6 +62,7 @@ function aDetalle(trabajador: TrabajadorConRelaciones): TrabajadorDetalle {
     fechaCese: aFechaIsoONula(trabajador.fechaCese),
     roles: trabajador.usuario.roles.map(({ rol }) => rol),
     clientesAsignados: trabajador.usuario._count.asignaciones,
+    tareasAbiertas,
   };
 }
 
@@ -85,7 +87,14 @@ export class ConsultaPersonalService {
       throw new NotFoundException({ mensaje: 'El trabajador no existe.', errores: [] });
     }
 
-    return aDetalle(trabajador);
+    const tareasAbiertas = await this.prisma.tarea.count({
+      where: {
+        estado: { notIn: [...ESTADOS_CERRADOS] },
+        OR: [{ responsableId: trabajador.usuarioId }, { revisorId: trabajador.usuarioId }],
+      },
+    });
+
+    return aDetalle(trabajador, tareasAbiertas);
   }
 
   async usuariosSinFicha(): Promise<UsuarioSinFicha[]> {
