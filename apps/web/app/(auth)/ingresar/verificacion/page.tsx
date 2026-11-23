@@ -1,7 +1,10 @@
+import { ShieldCheck } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { Aparecer } from '@/components/auth/appear';
+import { EncabezadoAcceso } from '@/components/auth-heading';
 import { leerDesafio } from '@/lib/session-cookie';
 import { FormularioVerificacion } from './mfa-form';
 
@@ -13,17 +16,18 @@ export default async function PaginaVerificacion(): Promise<ReactNode> {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-marino">Verificación en dos pasos</h1>
-        <p className="text-sm text-apagado">
-          Abra su aplicación autenticadora e ingrese el código vigente de TORRES ASOCIADOS SIGE.
-        </p>
-      </header>
+    <>
+      <EncabezadoAcceso
+        icono={<ShieldCheck aria-hidden="true" className="size-6" />}
+        titulo="Verificación en dos pasos"
+        descripcion="Ingrese el código de 6 dígitos de su aplicación autenticadora."
+      />
       <FormularioVerificacion />
-      <Link href="/ingresar" className="text-center text-sm font-medium text-marino-claro hover:underline">
-        Volver al ingreso
-      </Link>
-    </div>
+      <Aparecer className="text-center">
+        <Link href="/ingresar" className="text-sm font-semibold text-marino-claro hover:underline">
+          ← Volver al ingreso
+        </Link>
+      </Aparecer>
+    </>
   );
 }
