@@ -1,8 +1,26 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { EntornoModule } from './config/environment.module';
+import { ControlAccesoModule } from './modules/access-control/access-control.module';
+import { GuardiaPermisos } from './modules/access-control/permission.guard';
+import { AuditoriaModule } from './modules/audit/audit.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { GuardiaSesion } from './modules/auth/session.guard';
 import { HealthModule } from './modules/health/health.module';
+import { UsuariosModule } from './modules/users/users.module';
 
 @Module({
-  imports: [EntornoModule, HealthModule],
+  imports: [
+    EntornoModule,
+    HealthModule,
+    AuditoriaModule,
+    ControlAccesoModule,
+    AuthModule,
+    UsuariosModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: GuardiaSesion },
+    { provide: APP_GUARD, useClass: GuardiaPermisos },
+  ],
 })
 export class AppModule {}
