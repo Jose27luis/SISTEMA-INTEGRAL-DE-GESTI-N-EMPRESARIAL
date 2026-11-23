@@ -22,6 +22,8 @@ enum AccionAuditoria {
   SALIR
   REVOCAR_SESION
   PERMISO_DENEGADO
+  CAMBIAR_ESTADO
+  DESCARGAR
 }
 
 model Usuario {
@@ -54,6 +56,15 @@ model Usuario {
   asignaciones         AsignacionCliente[]  @relation("AsignacionesDelUsuario")
   asignacionesHechas   AsignacionCliente[]  @relation("AsignacionesHechasPor")
   asignacionesRetiradas AsignacionCliente[] @relation("AsignacionesRetiradasPor")
+  tareasResponsable    Tarea[]              @relation("ResponsableDeTarea")
+  tareasRevisor        Tarea[]              @relation("RevisorDeTarea")
+  tareasAsignadas      Tarea[]              @relation("AsignadorDeTarea")
+  colaboraciones       TareaColaborador[]
+  transiciones         TransicionTarea[]
+  avances              Avance[]
+  archivosSubidos      Archivo[]
+  comentarios          ComentarioTarea[]
+  notificaciones       Notificacion[]
 
   @@map("usuarios")
 }
@@ -308,6 +319,8 @@ model Cliente {
   creadoPor         Usuario?            @relation("CreadorDelCliente", fields: [creadoPorId], references: [id])
   contactos         ContactoCliente[]
   asignaciones      AsignacionCliente[]
+  tareas            Tarea[]
+  archivos          Archivo[]
 
   @@index([estado, razonSocial])
   @@map("clientes")
@@ -349,4 +362,209 @@ model AsignacionCliente {
   @@index([usuarioId, retiradoEn])
   @@index([clienteId, retiradoEn])
   @@map("asignaciones_cliente")
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  URGENTE
+}
+
+enum EstadoTarea {
+  PENDIENTE
+  EN_PROCESO
+  EN_REVISION
+  OBSERVADA
+  CORREGIDA
+  APROBADA
+  FINALIZADA
+  CANCELADA
+}
+
+enum TipoNotificacion {
+  TAREA_ASIGNADA
+  TAREA_MODIFICADA
+  TAREA_POR_VENCER
+  TAREA_ATRASADA
+  AVANCE_REGISTRADO
+  MENCION
+  TAREA_REASIGNADA
+}
+
+enum ResultadoEjecucion {
+  EN_CURSO
+  CORRECTO
+  ERROR
+}
+
+model Tarea {
+  id                 String      @id @default(uuid()) @db.Uuid
+  codigo             String      @unique
+  titulo             String
+  instrucciones      String?
+  clienteId          String?     @map("cliente_id") @db.Uuid
+  responsableId      String      @map("responsable_id") @db.Uuid
+  revisorId          String?     @map("revisor_id") @db.Uuid
+  asignadoPorId      String      @map("asignado_por_id") @db.Uuid
+  prioridad          Prioridad   @default(MEDIA)
+  estado             EstadoTarea @default(PENDIENTE)
+  fechaInicio        DateTime?   @map("fecha_inicio") @db.Date
+  fechaLimite        DateTime    @map("fecha_limite") @db.Date
+  requiereAprobacion Boolean     @default(true) @map("requiere_aprobacion")
+  requiereEvidencia  Boolean     @default(false) @map("requiere_evidencia")
+  evidenciaRequerida String?     @map("evidencia_requerida")
+  porcentajeAvance   Int         @default(0) @map("porcentaje_avance")
+  minutosRegistrados Int         @default(0) @map("minutos_registrados")
+  motivoCancelacion  String?     @map("motivo_cancelacion")
+  version            Int         @default(1)
+  creadoEn           DateTime    @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn      DateTime    @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  cliente       Cliente?           @relation(fields: [clienteId], references: [id])
+  responsable   Usuario            @relation("ResponsableDeTarea", fields: [responsableId], references: [id])
+  revisor       Usuario?           @relation("RevisorDeTarea", fields: [revisorId], references: [id])
+  asignadoPor   Usuario            @relation("AsignadorDeTarea", fields: [asignadoPorId], references: [id])
+  colaboradores TareaColaborador[]
+  transiciones  TransicionTarea[]
+  avances       Avance[]
+  comentarios   ComentarioTarea[]
+
+  @@index([responsableId, estado, fechaLimite])
+  @@index([clienteId, estado])
+  @@index([estado, fechaLimite])
+  @@map("tareas")
+}
+
+model TareaColaborador {
+  id         String    @id @default(uuid()) @db.Uuid
+  tareaId    String    @map("tarea_id") @db.Uuid
+  usuarioId  String    @map("usuario_id") @db.Uuid
+  agregadoEn DateTime  @default(now()) @map("agregado_en") @db.Timestamptz(3)
+  retiradoEn DateTime? @map("retirado_en") @db.Timestamptz(3)
+
+  tarea   Tarea   @relation(fields: [tareaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, retiradoEn])
+  @@index([tareaId, retiradoEn])
+  @@map("tareas_colaboradores")
+}
+
+model TransicionTarea {
+  id         String       @id @default(uuid()) @db.Uuid
+  tareaId    String       @map("tarea_id") @db.Uuid
+  desde      EstadoTarea?
+  hacia      EstadoTarea
+  usuarioId  String       @map("usuario_id") @db.Uuid
+  comentario String?
+  fecha      DateTime     @default(now()) @db.Timestamptz(3)
+
+  tarea   Tarea   @relation(fields: [tareaId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([tareaId, fecha])
+  @@map("transiciones_tarea")
+}
+
+model Avance {
+  id               String    @id @default(uuid()) @db.Uuid
+  tareaId          String    @map("tarea_id") @db.Uuid
+  autorId          String    @map("autor_id") @db.Uuid
+  registradoEn     DateTime  @default(now()) @map("registrado_en") @db.Timestamptz(3)
+  actividad        String
+  descripcion      String
+  porcentaje       Int
+  minutosDedicados Int       @default(0) @map("minutos_dedicados")
+  dificultades     String?
+  observaciones    String?
+  proximoPaso      String?   @map("proximo_paso")
+  corrigeAId       String?   @map("corrige_a_id") @db.Uuid
+
+  tarea       Tarea       @relation(fields: [tareaId], references: [id])
+  autor       Usuario     @relation(fields: [autorId], references: [id])
+  corrigeA    Avance?     @relation("CorreccionDeAvance", fields: [corrigeAId], references: [id])
+  correcciones Avance[]   @relation("CorreccionDeAvance")
+  evidencias  Evidencia[]
+
+  @@index([tareaId, registradoEn])
+  @@map("avances")
+}
+
+model Archivo {
+  id             String   @id @default(uuid()) @db.Uuid
+  rutaAlmacen    String   @unique @map("ruta_almacen")
+  nombreOriginal String   @map("nombre_original")
+  mime           String
+  tamanoBytes    Int      @map("tamano_bytes")
+  sha256         String   @db.Char(64)
+  clienteId      String?  @map("cliente_id") @db.Uuid
+  subidoPorId    String   @map("subido_por_id") @db.Uuid
+  subidoEn       DateTime @default(now()) @map("subido_en") @db.Timestamptz(3)
+
+  cliente    Cliente?    @relation(fields: [clienteId], references: [id])
+  subidoPor  Usuario     @relation(fields: [subidoPorId], references: [id])
+  evidencias Evidencia[]
+
+  @@map("archivos")
+}
+
+model Evidencia {
+  id        String @id @default(uuid()) @db.Uuid
+  avanceId  String @map("avance_id") @db.Uuid
+  archivoId String @map("archivo_id") @db.Uuid
+
+  avance  Avance  @relation(fields: [avanceId], references: [id])
+  archivo Archivo @relation(fields: [archivoId], references: [id])
+
+  @@index([avanceId])
+  @@index([archivoId])
+  @@map("evidencias")
+}
+
+model ComentarioTarea {
+  id          String   @id @default(uuid()) @db.Uuid
+  tareaId     String   @map("tarea_id") @db.Uuid
+  autorId     String   @map("autor_id") @db.Uuid
+  contenido   String
+  mencionados String[] @default([]) @db.Uuid
+  creadoEn    DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  tarea Tarea   @relation(fields: [tareaId], references: [id])
+  autor Usuario @relation(fields: [autorId], references: [id])
+
+  @@index([tareaId, creadoEn])
+  @@map("comentarios_tarea")
+}
+
+model Notificacion {
+  id                  String           @id @default(uuid()) @db.Uuid
+  usuarioId           String           @map("usuario_id") @db.Uuid
+  tipo                TipoNotificacion
+  titulo              String
+  mensaje             String
+  enlace              String
+  entidad             String
+  entidadId           String           @map("entidad_id")
+  claveDeduplicacion  String?          @unique @map("clave_deduplicacion")
+  leidaEn             DateTime?        @map("leida_en") @db.Timestamptz(3)
+  creadoEn            DateTime         @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId, creadoEn])
+  @@map("notificaciones")
+}
+
+model EjecucionProceso {
+  id        String             @id @default(uuid()) @db.Uuid
+  proceso   String
+  inicio    DateTime           @default(now()) @db.Timestamptz(3)
+  fin       DateTime?          @db.Timestamptz(3)
+  resultado ResultadoEjecucion @default(EN_CURSO)
+  registros Int                @default(0)
+  error     String?
+
+  @@index([proceso, inicio])
+  @@map("ejecuciones_proceso")
 }
