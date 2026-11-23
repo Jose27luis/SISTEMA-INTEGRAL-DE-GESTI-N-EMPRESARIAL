@@ -14,6 +14,7 @@ import {
   estadoConError,
   estadoExitoso,
   leerLista,
+  leerOpcional,
   leerTexto,
 } from '@/lib/form-state';
 
@@ -64,6 +65,7 @@ async function ejecutarConMotivo(
   accion: string,
   datos: FormData,
   mensajeExito: string,
+  adicionales: Record<string, unknown> = {},
 ): Promise<EstadoFormulario> {
   const validacion = validarMotivoConfirmado(usuarioId, datos);
 
@@ -73,7 +75,7 @@ async function ejecutarConMotivo(
 
   const resultado = await solicitarApi(`/usuarios/${usuarioId}/${accion}`, {
     metodo: 'POST',
-    cuerpo: { motivo: validacion.motivo },
+    cuerpo: { motivo: validacion.motivo, ...adicionales },
     esquema: esquemaUsuarioDetalle,
   });
 
@@ -193,7 +195,9 @@ export async function desactivarUsuario(
   _anterior: EstadoFormulario,
   datos: FormData,
 ): Promise<EstadoFormulario> {
-  return ejecutarConMotivo(usuarioId, 'desactivacion', datos, 'Usuario desactivado y sesiones cerradas.');
+  return ejecutarConMotivo(usuarioId, 'desactivacion', datos, 'Usuario desactivado y sesiones cerradas.', {
+    reasignarAId: leerOpcional(datos, 'reasignarAId'),
+  });
 }
 
 export async function activarUsuario(
