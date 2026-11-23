@@ -5,12 +5,13 @@ import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { cargarEntorno } from '../config/environment';
 import { HashContrasenas } from '../modules/security/password-hasher.service';
-import { generarContrasenaTemporal } from '../modules/security/tokens';
+import { esquemaContrasena } from '@sige/types';
 
 const esquemaArgumentos = z.object({
   nombre: z.string().trim().min(3).max(120),
   correo: z.email().trim().toLowerCase(),
   rol: z.string().trim().toUpperCase(),
+  contrasena: esquemaContrasena,
 });
 
 async function crearUsuario(): Promise<void> {
@@ -21,6 +22,7 @@ async function crearUsuario(): Promise<void> {
       nombre: { type: 'string' },
       correo: { type: 'string' },
       rol: { type: 'string' },
+      contrasena: { type: 'string' },
     },
   });
 
@@ -41,8 +43,7 @@ async function crearUsuario(): Promise<void> {
       throw new Error(`Ya existe un usuario con el correo ${argumentos.correo}.`);
     }
 
-    const contrasena = generarContrasenaTemporal();
-    const hashContrasena = await new HashContrasenas().hashear(contrasena);
+    const hashContrasena = await new HashContrasenas().hashear(argumentos.contrasena);
 
     await prisma.$transaction(async (tx) => {
       const usuario = await tx.usuario.create({
@@ -50,7 +51,6 @@ async function crearUsuario(): Promise<void> {
           nombre: argumentos.nombre,
           correo: argumentos.correo,
           hashContrasena,
-          debeCambiarContrasena: true,
           roles: { create: { rolId: rol.id } },
         },
       });
@@ -66,15 +66,7 @@ async function crearUsuario(): Promise<void> {
       });
     });
 
-    process.stdout.write(
-      [
-        `Usuario creado: ${argumentos.correo}`,
-        `Rol: ${rol.nombre}`,
-        `Contraseña temporal: ${contrasena}`,
-        'Debe cambiarla en el primer ingreso.',
-        '',
-      ].join('\n'),
-    );
+    process.stdout.write(`Usuario creado: ${argumentos.correo}\nRol: ${rol.nombre}\n`);
   } finally {
     await prisma.$disconnect();
   }
