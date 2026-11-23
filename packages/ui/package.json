@@ -4,7 +4,8 @@
   "private": true,
   "exports": {
     "./theme.css": "./src/theme.css",
-    "./cn": "./src/cn.ts"
+    "./cn": "./src/cn.ts",
+    "./components": "./src/components/index.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -14,9 +15,14 @@
     "clsx": "^2.1.1",
     "tailwind-merge": "^3.6.0"
   },
+  "peerDependencies": {
+    "react": "^19.2.8"
+  },
   "devDependencies": {
     "@sige/config": "workspace:*",
+    "@types/react": "^19.2.18",
     "eslint": "^10.15.0",
+    "react": "^19.2.8",
     "typescript": "^5.9.3"
   }
 }
