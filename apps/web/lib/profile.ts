@@ -18,13 +18,5 @@ export function tienePermiso(perfil: Perfil, permiso: CodigoPermiso): boolean {
 }
 
 export function rutaPendiente(perfil: Perfil): string | null {
-  if (perfil.pendientes.includes('CAMBIAR_CONTRASENA')) {
-    return '/cambiar-contrasena';
-  }
-
-  if (perfil.pendientes.includes('CONFIGURAR_MFA')) {
-    return '/configurar-mfa';
-  }
-
-  return null;
+  return perfil.pendientes.includes('CONFIGURAR_MFA') ? '/configurar-mfa' : null;
 }
