@@ -21,6 +21,7 @@ import {
   restablecerMfa,
   revocarSesiones,
 } from '../actions';
+import { FormularioRestablecerContrasena } from './password-reset-form';
 import { FormularioRolesUsuario } from './roles-form';
 
 export const metadata: Metadata = { title: 'Usuario · TORRES ASOCIADOS' };
@@ -102,15 +103,8 @@ export default async function PaginaUsuario({ params }: PropiedadesPaginaUsuario
           </dl>
           {puedeGestionar && datos.activo && !esPropio ? (
             <div className="mt-6 border-t border-borde pt-4">
-              <h3 className="mb-3 text-sm font-semibold text-marino">Restablecer contraseña</h3>
-              <FormularioConfirmacion
-                accion={restablecerContrasena.bind(null, datos.id)}
-                etiquetaBoton="Generar contraseña temporal"
-                textoPendiente="Generando…"
-                pedirMotivo
-                ayudaMotivo="Por ejemplo: el usuario olvidó su contraseña."
-                consecuencia="Su contraseña actual deja de funcionar, se cierran sus sesiones y deberá cambiar la temporal en el primer ingreso."
-              />
+              <h3 className="mb-3 text-sm font-semibold text-marino">Asignar nueva contraseña</h3>
+              <FormularioRestablecerContrasena accion={restablecerContrasena.bind(null, datos.id)} />
             </div>
           ) : null}
           {puedeGestionar && datos.mfaActivo && !esPropio ? (
