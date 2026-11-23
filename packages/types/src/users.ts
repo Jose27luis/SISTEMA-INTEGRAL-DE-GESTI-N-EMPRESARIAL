@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { esquemaRolReferencia, esquemaSesionResumen } from './auth';
+import { esquemaContrasena, esquemaRolReferencia, esquemaSesionResumen } from './auth';
 
 export const esquemaUsuarioResumen = z.object({
   id: z.uuid(),
@@ -21,11 +21,12 @@ export const esquemaAsignacionRoles = z.object({
   rolIds: z.array(z.uuid()).max(20),
 });
 
-export const esquemaContrasenaTemporal = z.object({
-  contrasenaTemporal: z.string().min(1),
+export const esquemaRestablecimientoContrasena = z.object({
+  contrasena: esquemaContrasena,
+  motivo: z.string().trim().min(5).max(500),
 });
 
-export type ContrasenaTemporal = z.infer<typeof esquemaContrasenaTemporal>;
+export type RestablecimientoContrasena = z.infer<typeof esquemaRestablecimientoContrasena>;
 export type UsuarioResumen = z.infer<typeof esquemaUsuarioResumen>;
 export type UsuarioDetalle = z.infer<typeof esquemaUsuarioDetalle>;
 export type AsignacionRoles = z.infer<typeof esquemaAsignacionRoles>;
