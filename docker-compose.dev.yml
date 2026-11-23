@@ -15,6 +15,16 @@ services:
       - ./apps/api/prisma:/app/apps/api/prisma
       - ./packages/types/src:/app/packages/types/src
 
+  worker:
+    image: sige/api:dev
+    command: sh -c "pnpm --filter @sige/types build && pnpm --filter @sige/api exec prisma generate && pnpm --filter @sige/api exec nest start --watch --entryFile worker"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
+      - ./apps/api/prisma:/app/apps/api/prisma
+      - ./packages/types/src:/app/packages/types/src
+
   web:
     build:
       target: development
