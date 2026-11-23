@@ -2,8 +2,8 @@
 
 import {
   esquemaAsignacionRoles,
-  esquemaContrasenaTemporal,
   esquemaMotivo,
+  esquemaRestablecimientoContrasena,
   esquemaUsuarioDetalle,
 } from '@sige/types';
 import { revalidatePath } from 'next/cache';
@@ -96,20 +96,46 @@ export async function restablecerContrasena(
     return validacion.estado;
   }
 
+  const valores = { motivo: validacion.motivo };
+  const contrasena = leerTexto(datos, 'contrasena');
+
+  if (contrasena !== leerTexto(datos, 'repeticion')) {
+    return estadoConError(
+      {
+        mensaje: 'Revise los datos ingresados.',
+        errores: [{ campo: 'repeticion', mensaje: 'Las contraseñas no coinciden.' }],
+      },
+      valores,
+    );
+  }
+
+  const entrada = esquemaRestablecimientoContrasena.safeParse({ contrasena, motivo: validacion.motivo });
+
+  if (!entrada.success) {
+    return estadoConError(
+      {
+        mensaje: 'Revise los datos ingresados.',
+        errores: entrada.error.issues.map((problema) => ({
+          campo: String(problema.path[0] ?? ''),
+          mensaje: problema.message,
+        })),
+      },
+      valores,
+    );
+  }
+
   const resultado = await solicitarApi(`/usuarios/${usuarioId}/restablecimiento-contrasena`, {
     metodo: 'POST',
-    cuerpo: { motivo: validacion.motivo },
-    esquema: esquemaContrasenaTemporal,
+    cuerpo: entrada.data,
+    esquema: esquemaUsuarioDetalle,
   });
 
   if (!resultado.ok) {
-    return estadoConError(resultado.error, { motivo: validacion.motivo });
+    return estadoConError(resultado.error, valores);
   }
 
   revalidatePath('/configuracion/usuarios', 'layout');
-  return estadoExitoso(
-    `Contraseña temporal: ${resultado.datos.contrasenaTemporal} — entréguela personalmente o por un canal seguro. No se volverá a mostrar y deberá cambiarse en el primer ingreso.`,
-  );
+  return estadoExitoso('Contraseña actualizada. Se cerraron las sesiones abiertas del usuario.');
 }
 
 export async function asignarRoles(
