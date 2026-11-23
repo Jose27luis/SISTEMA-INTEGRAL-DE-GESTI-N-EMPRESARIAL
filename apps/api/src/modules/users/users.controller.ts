@@ -1,10 +1,11 @@
 import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
 import {
   type AsignacionRoles,
-  type ContrasenaTemporal,
   esquemaAsignacionRoles,
   esquemaMotivo,
+  esquemaRestablecimientoContrasena,
   type Motivo,
+  type RestablecimientoContrasena,
   type UsuarioDetalle,
   type UsuarioResumen,
 } from '@sige/types';
@@ -90,11 +91,11 @@ export class UsuariosController {
   @RequierePermiso('usuario:gestionar')
   restablecerContrasena(
     @Param('id', validarId) id: string,
-    @Body(validarMotivo) datos: Motivo,
+    @Body(new ValidacionZod(esquemaRestablecimientoContrasena)) datos: RestablecimientoContrasena,
     @UsuarioActual() usuario: UsuarioAutenticado,
     @Cliente() cliente: ContextoCliente,
-  ): Promise<ContrasenaTemporal> {
-    return this.gestion.restablecerContrasena(id, datos.motivo, actorDesde(usuario, cliente));
+  ): Promise<UsuarioDetalle> {
+    return this.gestion.restablecerContrasena(id, datos, actorDesde(usuario, cliente));
   }
 
   @Post(':id/restablecimiento-mfa')
