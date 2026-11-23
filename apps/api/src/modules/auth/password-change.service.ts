@@ -4,7 +4,6 @@ import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/auth
 import { PrismaService } from '../../prisma/prisma.service';
 import { actorDesde, AuditoriaService } from '../audit/audit.service';
 import { HashContrasenas } from '../security/password-hasher.service';
-import { evaluarContrasena } from '../security/password-policy';
 import { SesionesService } from './sessions.service';
 
 @Injectable()
@@ -32,26 +31,17 @@ export class CambioContrasenaService {
       });
     }
 
-    const problemas = evaluarContrasena(datos.nueva, { correo: usuario.correo, nombre: usuario.nombre });
-
     if (datos.nueva === datos.actual) {
-      problemas.push('Debe ser distinta de la contraseña actual.');
-    }
-
-    if (problemas.length > 0) {
       throw new BadRequestException({
-        mensaje: 'La nueva contraseña no cumple la política de seguridad.',
-        errores: problemas.map((mensaje) => ({ campo: 'nueva', mensaje })),
+        mensaje: 'Revise los datos ingresados.',
+        errores: [{ campo: 'nueva', mensaje: 'Debe ser distinta de la contraseña actual.' }],
       });
     }
 
     const hashNuevo = await this.hash.hashear(datos.nueva);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.usuario.update({
-        where: { id: usuario.id },
-        data: { hashContrasena: hashNuevo, debeCambiarContrasena: false },
-      });
+      await tx.usuario.update({ where: { id: usuario.id }, data: { hashContrasena: hashNuevo } });
 
       const sesionesCerradas = await this.sesiones.revocarDeUsuario(
         usuario.id,
