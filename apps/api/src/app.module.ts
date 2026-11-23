@@ -9,7 +9,9 @@ import { GuardiaSesion } from './modules/auth/session.guard';
 import { CatalogosModule } from './modules/catalogs/catalogs.module';
 import { ClientesModule } from './modules/clients/clients.module';
 import { HealthModule } from './modules/health/health.module';
+import { NotificacionesModule } from './modules/notifications/notifications.module';
 import { PersonalModule } from './modules/staff/staff.module';
+import { TareasModule } from './modules/tasks/tasks.module';
 import { UsuariosModule } from './modules/users/users.module';
 
 @Module({
@@ -23,6 +25,8 @@ import { UsuariosModule } from './modules/users/users.module';
     CatalogosModule,
     PersonalModule,
     ClientesModule,
+    TareasModule,
+    NotificacionesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GuardiaSesion },
