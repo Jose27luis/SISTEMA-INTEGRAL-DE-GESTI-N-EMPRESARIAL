@@ -1,8 +1,12 @@
 import { z } from 'zod';
 import { esquemaCodigoPermiso } from './permissions';
 
-export const LONGITUD_MINIMA_CONTRASENA = 12;
 export const LONGITUD_MAXIMA_CONTRASENA = 128;
+
+export const esquemaContrasena = z
+  .string()
+  .min(1, 'Ingrese la contraseña.')
+  .max(LONGITUD_MAXIMA_CONTRASENA, `Máximo ${String(LONGITUD_MAXIMA_CONTRASENA)} caracteres.`);
 
 export const esquemaInicioSesion = z.object({
   correo: z.email().trim().toLowerCase(),
@@ -34,7 +38,7 @@ export const esquemaVerificacionMfa = z.object({
     .regex(/^(\d{6}|[A-Z2-9]{4}-[A-Z2-9]{4})$/),
 });
 
-export const PENDIENTES_INGRESO = ['CAMBIAR_CONTRASENA', 'CONFIGURAR_MFA'] as const;
+export const PENDIENTES_INGRESO = ['CONFIGURAR_MFA'] as const;
 
 export const esquemaPendienteIngreso = z.enum(PENDIENTES_INGRESO);
 
@@ -61,7 +65,7 @@ export const esquemaPerfil = z.object({
 
 export const esquemaCambioContrasena = z.object({
   actual: z.string().min(1).max(LONGITUD_MAXIMA_CONTRASENA),
-  nueva: z.string().min(LONGITUD_MINIMA_CONTRASENA).max(LONGITUD_MAXIMA_CONTRASENA),
+  nueva: esquemaContrasena,
 });
 
 export const esquemaConfiguracionMfa = z.object({
