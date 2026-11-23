@@ -12,6 +12,22 @@ export function formatearFechaHora(iso: string | null): string {
   return iso === null ? 'Nunca' : FORMATO_FECHA_HORA.format(new Date(iso));
 }
 
+export function formatearFecha(fecha: string): string {
+  const [anio, mes, dia] = fecha.split('-');
+  return `${dia ?? ''}/${mes ?? ''}/${anio ?? ''}`;
+}
+
+const FORMATO_FECHA_LIMA = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Lima',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export function fechaHoyEnLima(): string {
+  return FORMATO_FECHA_LIMA.format(new Date());
+}
+
 const NAVEGADORES: readonly [RegExp, string][] = [
   [/Edg\//u, 'Edge'],
   [/OPR\//u, 'Opera'],
