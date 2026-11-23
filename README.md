@@ -10,7 +10,7 @@ Plataforma web para administrar, controlar y supervisar las operaciones de **TOR
 | **Tipo de sistema** | Aplicación web adaptable a computadora, tablet y celular |
 | **Versión del documento de requerimientos** | 1.0 (noviembre de 2026) |
 | **Stack** | Next.js 16 + NestJS 12 + Prisma 7 + PostgreSQL 16, monorepo pnpm + Turborepo, Docker Compose |
-| **Estado del proyecto** | 📝 Análisis, requerimientos, arquitectura y plan de trabajo documentados; pendiente de aprobación de Gerencia |
+| **Estado del proyecto** | 🛠️ Fase 0: base técnica terminada y publicada en `https://sige.torresasociados.pe`; pendientes los entregables de Gerencia ([avance](#103-fase-0-análisis-diseño-y-base-técnica)) |
 
 ### Convenciones de este documento
 
@@ -911,7 +911,7 @@ flowchart TB
 
     PKG --> TYP["types/<br/>contratos de API, enums,<br/>esquemas Zod compartidos"]
     PKG --> UI["ui/<br/>componentes shadcn con<br/>tema institucional"]
-    PKG --> CFG["config/<br/>tsconfig y eslint compartidos"]
+    PKG --> CFG["config/<br/>configuración ESLint compartida"]
 
     API -.->|"depende de"| TYP
     WEBA -.->|"depende de"| TYP
@@ -2655,6 +2655,19 @@ Cubre los entregables previos a la programación: diseño de pantallas y prototi
 
 **Criterio de salida:** Gerencia aprueba por escrito el diseño funcional y el alcance de la Fase 1 antes de iniciar la programación.
 
+**Avance de la Fase 0**
+
+| # | Estado | Detalle |
+|---|---|---|
+| 0.5, 0.6 | ✅ Documentado | Procesos, mapa de navegación y modelo de datos en este README; pendientes de validación por Gerencia. |
+| 0.8 | ✅ Hecho | Monorepo base ([12.4](#124-monorepo-base)). |
+| 0.9 | ✅ Hecho | Docker Compose de producción y desarrollo, `.env.example`, entrypoint con migraciones; publicado en `https://sige.torresasociados.pe` ([12.6](#126-publicación-en-el-servidor)). |
+| 0.10 | ✅ Hecho | GitHub Actions ([12.7](#127-integración-continua)). |
+| 0.11 | ✅ Hecho | `CLAUDE.md` con las reglas del proyecto. |
+| 0.13 | ✅ Documentado | Plan de pruebas, gobierno y soporte en las secciones 10.11 y 10.14. |
+| 0.1, 0.2, 0.3, 0.7, 0.12, 0.14 | ⏳ Pendiente de Gerencia | Revisión de requerimientos, decisiones D-02 a D-14, logotipo y colores oficiales, inventario de datos a migrar, presupuesto y titularidad. |
+| 0.4 | ⏳ Pendiente | Prototipo navegable; requiere el logotipo y la guía visual (D-12). |
+
 ### 10.4 Fase 1: sistema base y control gerencial
 
 **Objetivo:** demostrar el circuito completo de asignación, avance, evidencia, revisión, observación, aprobación y consulta de historial desde el panel de Gerencia.
@@ -2791,7 +2804,7 @@ Aspectos que conviene decidir antes de diseñar cada fase, con una recomendació
 | D-12 | Logotipo y guía visual | Reutilizar los recursos de marca de torresasociados.pe si Gerencia lo autoriza. | Fase 0 |
 | D-13 | Leads del sitio web | Integrar los leads de torresasociados.pe como oportunidades mediante un endpoint con token, igual que la integración existente con cr3s3r. | Fase 4 |
 | D-14 | WhatsApp Business | Evaluar costo por conversación y requisitos de verificación de Meta antes de comprometerlo. | Fase 5 |
-| D-15 | Dominio | Definir el subdominio del sistema y si pasa por Cloudflare. | Fase 1 |
+| D-15 | Dominio | **Decidido:** `https://sige.torresasociados.pe`, detrás de Cloudflare (modo Full) con certificado Let's Encrypt en el origen (ver [Publicación en el servidor](#126-publicación-en-el-servidor)). | — |
 
 ### 10.10 Definición de terminado
 
@@ -2956,6 +2969,80 @@ git config --local --get user.email
 ### 12.3 Documentación
 
 Toda la documentación del proyecto (requerimientos, arquitectura, modelo de datos, procesos y plan de trabajo) se mantiene en este README; no se crean archivos de documentación separados.
+
+### 12.4 Monorepo base
+
+| Paquete | Ruta | Contenido actual |
+|---|---|---|
+| `@sige/api` | `apps/api` | NestJS 12, entorno validado con Zod, Prisma 7 con `@prisma/adapter-pg`, endpoint `GET /health` que comprueba la base de datos (200 si responde, 503 si no). |
+| `@sige/web` | `apps/web` | Next.js 16 con Tailwind CSS 4; página inicial que consulta `/health` desde el servidor y muestra el estado de la API y la base de datos. |
+| `@sige/types` | `packages/types` | Contratos compartidos como esquemas Zod (`esquemaEstadoSalud`) y sus tipos inferidos. |
+| `@sige/ui` | `packages/ui` | Tema institucional (`theme.css`: marino, dorado, verde y neutros) y la utilidad `cn`. |
+| `@sige/config` | `packages/config` | Configuración ESLint compartida: `typescript-eslint` estricto con tipos, `any` y `@ts-ignore` prohibidos. |
+
+Los códigos de color de `packages/ui/src/theme.css` son provisionales hasta que Gerencia entregue la guía visual oficial (decisión D-12).
+
+### 12.5 Puesta en marcha
+
+Requisitos: Docker con Compose. Node 22 y pnpm 11 solo se usan dentro de los contenedores; el servidor no necesita tenerlos instalados.
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+| Servicio | Dirección |
+|---|---|
+| Web | `http://127.0.0.1:3210` |
+| API | `http://127.0.0.1:3211/health` |
+
+Desarrollo con recarga en caliente (base de datos expuesta en `127.0.0.1:5434`):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+Verificación del monorepo (typecheck, lint y build) dentro de un contenedor Node 22:
+
+```bash
+docker run --rm -v "$PWD":/app -w /app node:22-alpine sh -c "corepack enable && pnpm install --frozen-lockfile && pnpm typecheck && pnpm lint && pnpm build"
+```
+
+El `.env` nunca se versiona; `POSTGRES_PASSWORD` debe reemplazarse por una clave fuerte antes del primer arranque.
+
+### 12.6 Publicación en el servidor
+
+| Dato | Valor |
+|---|---|
+| URL pública | `https://sige.torresasociados.pe` |
+| DNS | Registro proxeado por Cloudflare hacia el origen `187.77.60.97` (modo Full: el origen atiende 443). |
+| Certificado de origen | Let's Encrypt (ECDSA) emitido con `certbot --webroot`, renovación automática de certbot. |
+| Vhost de nginx | Versionado en `infra/nginx/sige.torresasociados.pe.conf` y copiado a `/etc/nginx/sites-available/sige.torresasociados.pe`, enlazado en `sites-enabled`. |
+| Destino | Solo la web (`127.0.0.1:3210`). La API (`127.0.0.1:3211`) no se publica: la web la consulta por la red interna de Docker. |
+| Cabeceras | HSTS de un año, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: DENY`, `frame-ancestors 'none'` y `X-Robots-Tag: noindex`. |
+| Tamaño máximo de petición | 25 MB (decisión D-05). |
+
+Actualizar el vhost tras modificarlo en el repositorio:
+
+```bash
+cp infra/nginx/sige.torresasociados.pe.conf /etc/nginx/sites-available/sige.torresasociados.pe
+nginx -t && systemctl reload nginx
+```
+
+`nginx -t` es obligatorio antes de recargar: el servidor atiende otros sitios en producción y una configuración inválida los afectaría a todos.
+
+### 12.7 Integración continua
+
+El flujo `.github/workflows/ci.yml` se ejecuta en cada push y pull request a `main`:
+
+| Trabajo | Pasos |
+|---|---|
+| `verificar` | Node según `.nvmrc`, pnpm según `packageManager`, `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`, `pnpm audit --audit-level high` y `pnpm build`. |
+| `imagenes` | Construye las imágenes Docker `runtime` de `api` y `web` (sin publicarlas), con caché de GitHub Actions. Solo corre si `verificar` pasa. |
+
+Las pruebas unitarias, de integración y e2e (sección 10.11) se agregan a este flujo en la Fase 1, junto con el primer código de negocio.
+
+**Override de seguridad:** `pnpm-workspace.yaml` fuerza `effect` a `^3.22.1` porque Prisma 7.10 arrastra una versión vulnerable a ReDoS (GHSA-7589-6fvf-x4pw). Se retira cuando Prisma publique una versión que ya dependa de la corregida.
 
 ---
 
