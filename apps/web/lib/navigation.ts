@@ -1,6 +1,14 @@
 import type { CodigoPermiso } from '@sige/types';
 
-export type IconoNavegacion = 'inicio' | 'cuenta' | 'usuarios' | 'roles' | 'auditoria';
+export type IconoNavegacion =
+  | 'inicio'
+  | 'cuenta'
+  | 'clientes'
+  | 'personal'
+  | 'usuarios'
+  | 'roles'
+  | 'catalogos'
+  | 'auditoria';
 
 export interface ElementoNavegacion {
   ruta: string;
@@ -23,10 +31,23 @@ export const NAVEGACION: GrupoNavegacion[] = [
     ],
   },
   {
+    titulo: 'Operación',
+    elementos: [
+      { ruta: '/clientes', etiqueta: 'Clientes', icono: 'clientes', permiso: 'cliente:ver' },
+      { ruta: '/personal', etiqueta: 'Personal', icono: 'personal', permiso: 'personal:ver' },
+    ],
+  },
+  {
     titulo: 'Administración',
     elementos: [
       { ruta: '/configuracion/usuarios', etiqueta: 'Usuarios', icono: 'usuarios', permiso: 'usuario:ver' },
       { ruta: '/configuracion/roles', etiqueta: 'Roles y permisos', icono: 'roles', permiso: 'rol:ver' },
+      {
+        ruta: '/configuracion/catalogos',
+        etiqueta: 'Catálogos',
+        icono: 'catalogos',
+        permiso: 'catalogo:gestionar',
+      },
       { ruta: '/auditoria', etiqueta: 'Auditoría', icono: 'auditoria', permiso: 'auditoria:ver' },
     ],
   },
