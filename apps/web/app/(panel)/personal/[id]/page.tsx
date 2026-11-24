@@ -117,6 +117,14 @@ export default async function PaginaTrabajador({ params }: PropiedadesPaginaTrab
               <dt className="text-apagado">Clientes asignados</dt>
               <dd>{trabajador.clientesAsignados}</dd>
             </dl>
+            {tienePermiso(perfil, 'tarea:ver') && (perfil.alcanceGlobal || esPropio) ? (
+              <Link
+                href={`/historial/${trabajador.usuarioId}`}
+                className="mt-4 mr-4 inline-flex text-sm font-semibold text-marino-claro hover:underline"
+              >
+                Historial y cumplimiento →
+              </Link>
+            ) : null}
             {tienePermiso(perfil, 'usuario:ver') ? (
               <Link
                 href={`/configuracion/usuarios/${trabajador.usuarioId}`}
