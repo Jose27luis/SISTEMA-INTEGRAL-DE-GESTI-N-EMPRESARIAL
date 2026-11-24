@@ -15,12 +15,12 @@ import type { Response } from 'express';
 import { z } from 'zod';
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
 import { Cliente, RequierePermiso, UsuarioActual } from '../../common/auth/decorators';
-import { fechaHoyEnLima, horaEnLima } from '../../common/dates';
+import { fechaHoyEnLima } from '../../common/dates';
 import { ValidacionZod } from '../../common/validation/zod-validation.pipe';
-import { actorDesde, AuditoriaService } from '../audit/audit.service';
+import { AuditoriaService } from '../audit/audit.service';
 import { ReporteClientesService } from './client-report.service';
 import { TableroService } from './dashboard.service';
-import { exportarExcel, exportarPdf, type TablaExportable } from './report-exporter';
+import { enviarReporte, momentoDeGeneracion } from './report-download';
 import { ReportesService } from './reports.service';
 import { HistorialTrabajadorService } from './staff-history.service';
 
@@ -42,11 +42,6 @@ function periodoAnterior(hoy: string): string {
   const [anio, mes] = hoy.split('-').map(Number);
   return new Date(Date.UTC(anio ?? 2000, (mes ?? 1) - 2, 1)).toISOString().slice(0, 7);
 }
-
-const TIPOS_CONTENIDO: Record<FormatoExportacion, string> = {
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  pdf: 'application/pdf',
-};
 
 @Controller()
 export class ReportesController {
@@ -93,11 +88,14 @@ export class ReportesController {
       return reporte;
     }
 
-    await this.enviarArchivo(
-      this.reportes.tablaPersonal(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), this.momento()),
-      `reporte-personal-${filtro.desde}-al-${filtro.hasta}`,
-      formato,
-      detallesDeFiltro(filtro),
+    await enviarReporte(
+      this.auditoria,
+      {
+        tabla: this.reportes.tablaPersonal(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), momentoDeGeneracion()),
+        nombre: `reporte-personal-${filtro.desde}-al-${filtro.hasta}`,
+        formato,
+        detalles: detallesDeFiltro(filtro),
+      },
       usuario,
       cliente,
       respuesta,
@@ -120,11 +118,14 @@ export class ReportesController {
       return reporte;
     }
 
-    await this.enviarArchivo(
-      this.reportes.tablaActividades(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), this.momento()),
-      `reporte-actividades-${filtro.desde}-al-${filtro.hasta}`,
-      formato,
-      detallesDeFiltro(filtro),
+    await enviarReporte(
+      this.auditoria,
+      {
+        tabla: this.reportes.tablaActividades(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), momentoDeGeneracion()),
+        nombre: `reporte-actividades-${filtro.desde}-al-${filtro.hasta}`,
+        formato,
+        detalles: detallesDeFiltro(filtro),
+      },
       usuario,
       cliente,
       respuesta,
@@ -148,46 +149,18 @@ export class ReportesController {
       return reporte;
     }
 
-    await this.enviarArchivo(
-      this.reporteClientes.tabla(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), this.momento()),
-      `reporte-clientes-${periodo}`,
-      formato,
-      { periodo },
+    await enviarReporte(
+      this.auditoria,
+      {
+        tabla: this.reporteClientes.tabla(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), momentoDeGeneracion()),
+        nombre: `reporte-clientes-${periodo}`,
+        formato,
+        detalles: { periodo },
+      },
       usuario,
       cliente,
       respuesta,
     );
     return undefined;
-  }
-
-  private momento(): string {
-    const [anio, mes, dia] = fechaHoyEnLima().split('-');
-    return `${dia ?? ''}/${mes ?? ''}/${anio ?? ''} ${horaEnLima(new Date())}`;
-  }
-
-  private async enviarArchivo(
-    tabla: TablaExportable,
-    nombre: string,
-    formato: FormatoExportacion,
-    detalles: Record<string, string | null>,
-    usuario: UsuarioAutenticado,
-    cliente: ContextoCliente,
-    respuesta: Response,
-  ): Promise<void> {
-    const contenido = formato === 'xlsx' ? await exportarExcel(tabla) : await exportarPdf(tabla);
-
-    await this.auditoria.registrar({
-      actor: actorDesde(usuario, cliente),
-      accion: 'DESCARGAR',
-      entidad: 'reporte',
-      entidadId: null,
-      despues: { reporte: tabla.titulo, formato, ...detalles, filas: tabla.filas.length },
-    });
-
-    respuesta.setHeader('Content-Type', TIPOS_CONTENIDO[formato]);
-    respuesta.setHeader('Content-Disposition', `attachment; filename="${nombre}.${formato}"`);
-    respuesta.setHeader('Cache-Control', 'private, no-store');
-    respuesta.setHeader('X-Content-Type-Options', 'nosniff');
-    respuesta.end(contenido);
   }
 }
