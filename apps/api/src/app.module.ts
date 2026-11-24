@@ -7,14 +7,18 @@ import { AuditoriaModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { GuardiaSesion } from './modules/auth/session.guard';
 import { CatalogosModule } from './modules/catalogs/catalogs.module';
+import { OperacionClienteModule } from './modules/client-operations/client-operations.module';
 import { ClientesModule } from './modules/clients/clients.module';
 import { DocumentosModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotificacionesModule } from './modules/notifications/notifications.module';
 import { ObligacionesModule } from './modules/obligations/obligations.module';
+import { AccesosPlataformaModule } from './modules/platform-access/platform-access.module';
 import { ReportesModule } from './modules/reports/reports.module';
+import { BusquedaModule } from './modules/search/search.module';
 import { PersonalModule } from './modules/staff/staff.module';
 import { TareasModule } from './modules/tasks/tasks.module';
+import { PlantillasModule } from './modules/templates/templates.module';
 import { UsuariosModule } from './modules/users/users.module';
 
 @Module({
@@ -33,6 +37,10 @@ import { UsuariosModule } from './modules/users/users.module';
     ReportesModule,
     ObligacionesModule,
     DocumentosModule,
+    PlantillasModule,
+    AccesosPlataformaModule,
+    OperacionClienteModule,
+    BusquedaModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GuardiaSesion },
