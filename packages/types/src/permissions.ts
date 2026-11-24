@@ -20,6 +20,8 @@ export const CODIGOS_PERMISO = [
   'obligacion:ver',
   'obligacion:gestionar',
   'cronograma:gestionar',
+  'documento:ver',
+  'documento:gestionar',
 ] as const;
 
 export const esquemaCodigoPermiso = z.enum(CODIGOS_PERMISO);
