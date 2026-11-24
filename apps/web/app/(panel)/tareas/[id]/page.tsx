@@ -91,6 +91,15 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
+          {tarea.obligacionId === null ? null : (
+            <Alerta tono="info" titulo="Tarea de una obligación tributaria">
+              Registre la presentación con su constancia desde la{' '}
+              <Link href={`/obligaciones/${tarea.obligacionId}`} className="font-semibold underline">
+                obligación
+              </Link>
+              : así queda la fecha, el número de orden y la constancia en el control tributario.
+            </Alerta>
+          )}
           {tarea.atrasada ? (
             <Alerta tono="error" titulo="Tarea atrasada">
               Venció el {formatearFecha(tarea.fechaLimite)}. Registre un avance o coordine una nueva fecha con quien la
