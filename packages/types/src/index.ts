@@ -4,6 +4,7 @@ export * from './catalogs';
 export * from './clients';
 export * from './common';
 export * from './documents';
+export * from './finance';
 export * from './health';
 export * from './identity-documents';
 export * from './incidents';
