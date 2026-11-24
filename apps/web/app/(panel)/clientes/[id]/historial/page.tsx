@@ -13,6 +13,11 @@ const ETIQUETAS_ACCION: Partial<Record<string, string>> = {
   ACTIVAR: 'Activación',
   DESACTIVAR: 'Desactivación',
   PERMISO_DENEGADO: 'Acceso denegado',
+  CAMBIAR_ESTADO: 'Cambio de estado',
+  DESCARGAR: 'Descarga',
+  ARCHIVAR: 'Archivo',
+  CONSULTAR: 'Consulta',
+  ANULAR: 'Anulación',
 };
 
 interface PropiedadesPaginaHistorial {
