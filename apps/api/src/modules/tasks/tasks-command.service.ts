@@ -1,6 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import {
+  type AccionTarea,
   type EdicionTarea,
+  type EstadoTarea,
   ESTADOS_CERRADOS,
   estadoTrasAccion,
   ETIQUETAS_PRIORIDAD,
@@ -9,6 +11,7 @@ import {
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
 import { aFechaDb, formatearFechaPeruana } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PermisosEfectivosService } from '../access-control/effective-permissions.service';
 import { actorDesde, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
 import { NotificacionesService } from '../notifications/notifications.service';
 import { AccesoTareasService } from './task-access.service';
@@ -48,6 +51,7 @@ export class GestionTareasService {
     private readonly acceso: AccesoTareasService,
     private readonly auditoria: AuditoriaService,
     private readonly notificaciones: NotificacionesService,
+    private readonly permisos: PermisosEfectivosService,
   ) {}
 
   async crear(entrada: TareaEntrada, usuario: UsuarioAutenticado, contexto: ContextoCliente): Promise<string> {
@@ -259,13 +263,17 @@ export class GestionTareasService {
 
   async cambiarEstado(
     id: string,
-    accion: 'INICIAR',
+    accion: AccionTarea,
     usuario: UsuarioAutenticado,
     contexto: ContextoCliente,
-    comentario: string,
+    comentario: string | null,
     db: ClienteBaseDatos,
-  ): Promise<void> {
-    const tarea = await db.tarea.findUniqueOrThrow({ where: { id }, select: { estado: true, requiereAprobacion: true } });
+    adicionales: { motivoCancelacion?: string } = {},
+  ): Promise<EstadoTarea> {
+    const tarea = await db.tarea.findUniqueOrThrow({
+      where: { id },
+      select: { estado: true, requiereAprobacion: true, completadaEn: true },
+    });
     const destino = estadoTrasAccion(tarea.estado, accion, tarea.requiereAprobacion);
 
     if (destino === null) {
@@ -275,9 +283,15 @@ export class GestionTareasService {
       });
     }
 
+    const completa = (destino === 'APROBADA' || destino === 'FINALIZADA') && tarea.completadaEn === null;
     const actualizacion = await db.tarea.updateMany({
       where: { id, estado: tarea.estado },
-      data: { estado: destino, version: { increment: 1 } },
+      data: {
+        estado: destino,
+        version: { increment: 1 },
+        ...(completa ? { completadaEn: new Date() } : {}),
+        ...(adicionales.motivoCancelacion === undefined ? {} : { motivoCancelacion: adicionales.motivoCancelacion }),
+      },
     });
 
     if (actualizacion.count === 0) {
@@ -296,10 +310,12 @@ export class GestionTareasService {
         entidadId: id,
         antes: { estado: tarea.estado },
         despues: { estado: destino },
-        motivo: comentario,
+        ...(comentario === null ? {} : { motivo: comentario }),
       },
       db,
     );
+
+    return destino;
   }
 
   private async validar(entrada: TareaEntrada, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
@@ -331,7 +347,14 @@ export class GestionTareasService {
     }
 
     if (entrada.revisorId !== null) {
-      await this.acceso.asegurarParticipante(entrada.revisorId, entrada.clienteId, 'revisorId', db);
+      const nombre = await this.acceso.asegurarParticipante(entrada.revisorId, entrada.clienteId, 'revisorId', db);
+
+      if (!(await this.permisos.resolver(entrada.revisorId)).permisos.has('tarea:revisar')) {
+        throw new BadRequestException({
+          mensaje: 'Revise los datos ingresados.',
+          errores: [{ campo: 'revisorId', mensaje: `${nombre} no tiene permiso para aprobar u observar tareas.` }],
+        });
+      }
     }
   }
 
