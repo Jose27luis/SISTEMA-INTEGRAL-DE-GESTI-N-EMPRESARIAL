@@ -14,14 +14,17 @@ import { solicitarApi } from '@/lib/api';
 import { formatearFecha, formatearFechaHora, formatearMinutos, formatearTamano } from '@/lib/format';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
 import {
+  agregarItem,
   cancelarTarea,
   comentarTarea,
   enviarTarea,
   finalizarTarea,
   iniciarTarea,
+  marcarItem,
   registrarAvance,
   revisarTarea,
 } from '../actions';
+import { ListaVerificacion } from './checklist';
 import { FormularioComentario } from './comment-form';
 import { FormularioAvance } from './progress-form';
 import { FormularioEnvio, FormularioRevision } from './review-forms';
@@ -117,6 +120,22 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
               </p>
             ) : null}
           </Tarjeta>
+
+          {tarea.items.length > 0 || tarea.acciones.registrarAvance || tarea.acciones.editar ? (
+            <Tarjeta
+              titulo="Lista de verificación"
+              {...(tarea.plantilla === null ? {} : { descripcion: `Desde la plantilla «${tarea.plantilla.nombre}».` })}
+            >
+              <ListaVerificacion
+                items={tarea.items}
+                editable={tarea.acciones.registrarAvance || tarea.acciones.editar}
+                marcadores={Object.fromEntries(
+                  tarea.items.map((item) => [item.id, marcarItem.bind(null, tarea.id, item.id, !item.completado)]),
+                )}
+                agregar={agregarItem.bind(null, tarea.id)}
+              />
+            </Tarjeta>
+          ) : null}
 
           {tarea.estado === 'CANCELADA' && tarea.motivoCancelacion !== null ? (
             <Alerta tono="aviso" titulo="Tarea cancelada">
