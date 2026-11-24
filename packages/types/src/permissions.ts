@@ -15,6 +15,8 @@ export const CODIGOS_PERMISO = [
   'catalogo:gestionar',
   'tarea:ver',
   'tarea:crear',
+  'tarea:revisar',
+  'reporte:personal',
 ] as const;
 
 export const esquemaCodigoPermiso = z.enum(CODIGOS_PERMISO);
