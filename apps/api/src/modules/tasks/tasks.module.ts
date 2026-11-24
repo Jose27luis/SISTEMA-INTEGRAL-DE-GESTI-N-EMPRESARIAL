@@ -9,6 +9,7 @@ import { AccesoTareasService } from './task-access.service';
 import { ArchivosTareaService } from './task-files.service';
 import { AvancesTareaService } from './task-progress.service';
 import { ReasignacionTareasService } from './task-reassignment.service';
+import { RevisionTareasService } from './task-review.service';
 import { GestionTareasService } from './tasks-command.service';
 import { TareasController } from './tasks.controller';
 import { ConsultaTareasService } from './tasks-query.service';
@@ -23,7 +24,8 @@ import { ConsultaTareasService } from './tasks-query.service';
     AvancesTareaService,
     ArchivosTareaService,
     ReasignacionTareasService,
+    RevisionTareasService,
   ],
-  exports: [ReasignacionTareasService],
+  exports: [ReasignacionTareasService, AccesoTareasService],
 })
 export class TareasModule {}
