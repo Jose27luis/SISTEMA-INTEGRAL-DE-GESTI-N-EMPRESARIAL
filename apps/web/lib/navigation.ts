@@ -6,6 +6,9 @@ export type IconoNavegacion =
   | 'mi-trabajo'
   | 'tareas'
   | 'notificaciones'
+  | 'historial'
+  | 'por-revisar'
+  | 'reportes'
   | 'clientes'
   | 'personal'
   | 'usuarios'
@@ -31,6 +34,7 @@ export const NAVEGACION: GrupoNavegacion[] = [
     elementos: [
       { ruta: '/inicio', etiqueta: 'Inicio', icono: 'inicio', permiso: null },
       { ruta: '/mi-trabajo', etiqueta: 'Mi trabajo', icono: 'mi-trabajo', permiso: 'tarea:ver' },
+      { ruta: '/mi-historial', etiqueta: 'Mi historial', icono: 'historial', permiso: 'tarea:ver' },
       { ruta: '/notificaciones', etiqueta: 'Notificaciones', icono: 'notificaciones', permiso: null },
       { ruta: '/mi-cuenta', etiqueta: 'Mi cuenta', icono: 'cuenta', permiso: null },
     ],
@@ -39,8 +43,10 @@ export const NAVEGACION: GrupoNavegacion[] = [
     titulo: 'Operación',
     elementos: [
       { ruta: '/tareas', etiqueta: 'Tareas', icono: 'tareas', permiso: 'tarea:ver' },
+      { ruta: '/por-revisar', etiqueta: 'Por revisar', icono: 'por-revisar', permiso: 'tarea:revisar' },
       { ruta: '/clientes', etiqueta: 'Clientes', icono: 'clientes', permiso: 'cliente:ver' },
       { ruta: '/personal', etiqueta: 'Personal', icono: 'personal', permiso: 'personal:ver' },
+      { ruta: '/reportes', etiqueta: 'Reportes', icono: 'reportes', permiso: 'reporte:personal' },
     ],
   },
   {
