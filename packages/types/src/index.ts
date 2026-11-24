@@ -7,6 +7,7 @@ export * from './health';
 export * from './identity-documents';
 export * from './notifications';
 export * from './permissions';
+export * from './reports';
 export * from './roles';
 export * from './staff';
 export * from './task-states';
