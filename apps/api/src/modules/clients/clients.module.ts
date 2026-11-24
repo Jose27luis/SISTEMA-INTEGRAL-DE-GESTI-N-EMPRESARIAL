@@ -19,5 +19,6 @@ import { ImportacionClientesService } from './import/client-import.service';
     EquipoClienteService,
     ImportacionClientesService,
   ],
+  exports: [AccesoClientesService],
 })
 export class ClientesModule {}
