@@ -2756,7 +2756,7 @@ Terminado y publicado el 24/11/2026; detalle y pendientes en [12.11](#1211-sprin
 |---|---|---|
 | 5 ✅ | Tipos de obligación, configuración por cliente, carga del cronograma oficial por periodo y último dígito, generación mensual de obligaciones con tarea, control mensual cliente × obligación, calendario tributario. Detalle en [12.12](#1212-sprint-5-obligaciones-tributarias-y-cronograma). | RF-TRI-01 a 08, 11, 12, RF-AUTO-02, RF-GER-05 |
 | 6 ✅ | Documentos con tipos, carpetas, versiones, vencimientos, búsqueda, documentación esperada; integración de evidencias y constancias al expediente. Detalle en [12.13](#1213-sprint-6-documentos-y-expediente-documental). | RF-DOC-01 a 10, RF-NOT-04 |
-| 7 | Rectificaciones e historial tributario, plantillas y tareas recurrentes, accesos de plataformas, ficha operativa, incidencias, búsqueda general, reportes de clientes | RF-TRI-09, 10, RF-TAR-12, 13, RF-AUTO-01, 07, RF-ACC-01 a 05, RF-CLI-06, 09, RF-BUS-01 a 03, RF-REP-04 |
+| 7 ✅ | Rectificaciones e historial tributario, plantillas y tareas recurrentes, accesos de plataformas, ficha operativa, incidencias, búsqueda general, reportes de clientes. Detalle en [12.14](#1214-sprint-7-operación-recurrencia-accesos-y-búsqueda). | RF-TRI-09, 10, RF-TAR-12, 13, RF-AUTO-01, 07, RF-ACC-01 a 05, RF-CLI-06, 09, RF-BUS-01 a 03, RF-REP-04 |
 
 **Criterios de aceptación:**
 
@@ -3589,6 +3589,136 @@ El periodo de los indicadores no puede superar un año, y la fecha final no pued
 | Clasificación por proyecto (RF-DOC-01) | Se agrega con el módulo de proyectos (Fase 4). |
 | Restaurar un documento archivado | No se pidió; queda consultable y su historial se conserva. |
 | Buscar por el contenido de los archivos | Fuera del alcance; la búsqueda es por los datos del documento. |
+
+### 12.14 Sprint 7: operación, recurrencia, accesos y búsqueda
+
+**Modelo de datos** (migración `20261128120000_operacion_y_accesos`):
+
+- **`rectificaciones`:** obligación original, motivo (CHECK de al menos 5 caracteres), fecha, número de orden, constancia obligatoria y quién la registró.
+- **`plantillas_tarea`:**
+  - Contenido: nombre único, título, instrucciones, prioridad, plazo en días (0 a 365), aprobación, evidencia y hasta 30 pasos de verificación.
+  - Restricciones: si exige evidencia, debe describirla (CHECK).
+- **`reglas_recurrencia`:**
+  - Contenido: plantilla, cliente opcional, responsable, revisor, frecuencia mensual (días 1 a 28) o semanal (lunes a domingo) y vigencia.
+  - Restricciones: un CHECK exige que el día corresponda a la frecuencia y otro que el revisor sea distinto del responsable.
+- **`items_verificacion`:** pasos de cada tarea en orden, con quién y cuándo los completó.
+- **`tareas`:** ganan `plantilla_id`, `regla_id` y `fecha_ocurrencia`. El par regla + fecha es único, para no generar dos veces la misma ocurrencia.
+- **`plataformas`:** SUNAT, SUNARP, Banco, AFP, EsSalud, Sistema contable, Correo y Otra.
+- **`accesos_plataforma`:**
+  - Contenido: plataforma, dirección, identificador no secreto, responsable autorizado, fecha de revisión, estado, doble verificación, **referencia de la bóveda** y notas.
+  - No existe ninguna columna para contraseñas (RF-ACC-02, D-02).
+- **`incidencias`:** cliente, título, descripción, fecha, responsable y estado (Abierta, En atención, Resuelta o Anulada). Al cerrarla exige el texto de cierre (CHECK).
+- **Extensión `unaccent`**, para la búsqueda sin tildes.
+- **Auditoría:** nueva acción `CONSULTAR`.
+- **Notificaciones nuevas:** `ACCESO_POR_REVISAR` e `INCIDENCIA_ASIGNADA`.
+- **Permisos nuevos:**
+  - `acceso:ver` y `acceso:gestionar`: Gerencia y Contabilidad.
+  - `incidencia:gestionar`: Gerencia, Contabilidad, Asistente contable y Administración.
+  - `plantilla:gestionar`: Gerencia, Contabilidad y Administración.
+  - `reporte:clientes`: Gerencia.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `POST /obligaciones/:id/rectificaciones` | Responsable o colaborador, o `obligacion:gestionar` | Multipart con motivo, fecha, número de orden y constancia; solo sobre obligaciones cumplidas. |
+| `GET /obligaciones/clientes/:clienteId/historial` | `obligacion:ver` y cliente asignado | Periodos con presentación, constancia, rectificaciones y observaciones. |
+| `GET /plantillas`, `POST /plantillas`, `PUT /plantillas/:id`, `POST /plantillas/:id/activacion` | Lectura con `tarea:ver`; cambios con `plantilla:gestionar` | Plantillas de tareas; desactivar una pausa sus reglas. |
+| `GET /tareas-recurrentes`, `POST /tareas-recurrentes`, `POST /tareas-recurrentes/:id/activacion` | `plantilla:gestionar` | Reglas con la próxima fecha y las tareas generadas. |
+| `POST /tareas/:id/items`, `POST /tareas/:id/items/:itemId` | Participantes de la tarea | Agregar y marcar pasos de la lista de verificación. |
+| `GET /accesos/plataformas`, `GET /accesos/clientes/:clienteId` | `acceso:ver` y cliente asignado | Cada consulta se audita como `CONSULTAR`. |
+| `POST /accesos/clientes/:clienteId`, `PUT …/:accesoId` | `acceso:gestionar` | Registrar o actualizar accesos. |
+| `GET /clientes/:clienteId/ficha-operativa` | `cliente:ver` y cliente asignado | Obligaciones del último periodo, documentación, actividades, tareas abiertas e incidencias. |
+| `POST /clientes/:clienteId/incidencias`, `POST …/incidencias/:id/estado` | `incidencia:gestionar` | Registrar incidencias y cambiar su estado. |
+| `GET /busqueda?q=` | `tarea:ver` | Clientes, tareas y documentos visibles. |
+| `GET /procesos?proceso=&resultado=` | `auditoria:ver` | Último resultado de cada proceso, errores de 24 horas y las últimas 200 ejecuciones. |
+| `GET /reportes/clientes?periodo=[&formato=xlsx\|pdf]` | `reporte:clientes` | Reporte de clientes. |
+
+**Reglas implementadas**
+
+- **Rectificaciones (RF-TRI-09):**
+  - Solo sobre obligaciones ya cumplidas.
+  - La fecha no puede ser futura ni anterior a la presentación original.
+  - La constancia es un PDF o una imagen verificados por su contenido.
+  - Se guarda en el expediente del cliente y la pueden descargar los usuarios asignados a ese cliente.
+- **Historial tributario (RF-TRI-10):** en la pestaña Obligaciones del cliente, por periodo, con estado, presentación, constancia, número de orden, observaciones y rectificaciones.
+- **Plantillas (RF-TAR-12 y 13):**
+  - Al crear una tarea desde una plantilla se completan el título, las instrucciones, la prioridad, la fecha límite (hoy más el plazo), la aprobación, la evidencia y la lista de verificación. Todo se puede ajustar antes de guardar.
+  - La lista se puede ampliar después (hasta 30 pasos).
+  - Marcan los pasos el responsable, los colaboradores, quien asignó la tarea y Gerencia, mientras la tarea esté abierta. Cada marca queda auditada.
+- **Tareas recurrentes (RF-AUTO-01):**
+  - El worker corre cada día a las 05:30 (hora de Lima) y al arrancar.
+  - Genera las ocurrencias de los últimos 7 días que falten, por si el proceso no corrió.
+  - Cada tarea lleva la plantilla, sus pasos y como fecha límite la ocurrencia más el plazo.
+  - Se omite, y queda registrado en el proceso, si el cliente está inactivo o si el responsable o el revisor ya no está activo o asignado.
+- **Accesos (RF-ACC-01 a 05):**
+  - El detector de secretos, compartido por la web y la API, rechaza en todos los campos de texto:
+    - Etiquetas seguidas de un valor, como `Clave SOL:`, `contraseña=`, `PIN:` o `token=`.
+    - Tokens JWT, claves de nube y llaves privadas.
+    - Números de tarjeta válidos por Luhn y parámetros secretos en direcciones.
+    - Cadenas que parecen contraseñas aleatorias.
+  - Admite correos, direcciones, RUC e identificadores de la bóveda.
+  - Solo los ven Gerencia y Contabilidad asignada al cliente, y cada consulta queda en la auditoría.
+  - Cada hora (minuto 35), los accesos activos con la revisión vencida avisan al responsable autorizado y a los responsables del cliente, una vez por fecha de revisión.
+- **Incidencias y ficha operativa (RF-CLI-06 y 09):**
+  - La nueva pestaña Operación del cliente reúne las obligaciones y el estado de su último periodo, la documentación recibida, pendiente y atrasada, las últimas 10 tareas completadas, las tareas abiertas y las incidencias.
+  - El responsable de la incidencia recibe un aviso.
+  - Una incidencia pasa de Abierta a En atención, Resuelta o Anulada; de En atención solo a Resuelta o Anulada. Cerrarla exige texto y no se reabre.
+- **Búsqueda general (RF-BUS-01 a 03):**
+  - Está en la parte superior de todas las páginas.
+  - Busca clientes por nombre, RUC o DNI, tareas por título o código y documentos vigentes por título.
+  - Ignora tildes y mayúsculas (`unaccent`).
+  - Aplica los mismos filtros de visibilidad que el resto del sistema.
+  - Los módulos de proyectos se sumarán cuando existan.
+- **Procesos (RF-AUTO-07):** Gerencia ve el último resultado de cada proceso, los errores de las últimas 24 horas y las ejecuciones con su error.
+- **Reporte de clientes (RF-REP-04):** por cliente, el estado, el régimen, las obligaciones configuradas, las cumplidas, pendientes y vencidas del periodo, la documentación faltante y las incidencias abiertas. Se exporta en Excel y PDF con totales, y cada descarga se audita.
+
+**Pantallas web:**
+
+- **Buscador general** y página de resultados.
+- **Tareas:**
+  - Nueva tarea con selector de plantilla y lista de verificación.
+  - Lista de verificación en el detalle.
+  - **Tareas recurrentes**, con su próxima fecha.
+- **Administración:** **Plantillas de tareas** y **Procesos automáticos**.
+- **Reporte de clientes**, con vista previa, Excel y PDF.
+- **Expediente del cliente:** pestañas **Operación** y **Accesos**, y el historial tributario en Obligaciones.
+- **Detalle de la obligación:** rectificaciones y formulario para registrarlas.
+
+**Verificación realizada:** typecheck, lint, 88 pruebas unitarias (7 nuevas del detector de secretos y 5 de recurrencia) y build. La migración se aplicó sobre las anteriores y el esquema no queda con diferencias. Contra un stack desechable con PostgreSQL real se probaron:
+
+- **Accesos:**
+  - Se rechazaron las notas con «Clave SOL: …» y el identificador con «pass=…».
+  - El acceso válido quedó con la revisión vencida; la asistente recibió 403 y la consulta de la contadora quedó auditada.
+  - El worker avisó la revisión vencida.
+- **Incidencias:**
+  - En un cliente no asignado se recibió 403.
+  - Resolver sin texto se rechazó; con texto quedó Resuelta, y reabrirla dio 409.
+  - El responsable recibió `INCIDENCIA_ASIGNADA`.
+- **Plantillas y lista:**
+  - La asistente recibió 403 al crear una plantilla.
+  - La tarea creada desde la plantilla llevó sus 3 pasos; la asistente marcó uno y agregó otro, ambos auditados.
+- **Recurrencia:**
+  - Una regla mensual del día generó una tarea con sus 3 pasos y una fecha límite de 5 días.
+  - Al volver a correr el worker no se duplicó, y la próxima fecha pasó al mes siguiente.
+- **Rectificación:**
+  - La fecha futura dio 400.
+  - La rectificación válida quedó en el detalle y en el historial, y su constancia se descargó como PDF.
+- **Búsqueda:**
+  - «construccion nandu» encontró «Construcción Ñandú SAC».
+  - La asistente no encontró un cliente no asignado, que la contadora sí ve; el RUC parcial también funciona.
+- **Procesos y reporte:**
+  - La asistente y la contadora recibieron 403.
+  - Gerencia vio los 6 procesos correctos y el reporte, en JSON, Excel y PDF reales, también a través de la web.
+- **Web:** las 12 páginas nuevas o modificadas se renderizaron con datos reales.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| Buscar proyectos (RF-BUS-01) | Con el módulo de proyectos (Fase 4). |
+| Integración directa con la API de la bóveda | No se pidió; el registro guarda la referencia de la entrada (D-02). |
+| Editar o reordenar los pasos de una lista ya creada | Se pueden agregar y marcar; no se borran, para conservar el historial. |
 
 ---
 
