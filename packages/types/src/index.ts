@@ -3,6 +3,7 @@ export * from './auth';
 export * from './catalogs';
 export * from './clients';
 export * from './common';
+export * from './documents';
 export * from './health';
 export * from './identity-documents';
 export * from './notifications';
