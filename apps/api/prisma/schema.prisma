@@ -24,6 +24,7 @@ enum AccionAuditoria {
   PERMISO_DENEGADO
   CAMBIAR_ESTADO
   DESCARGAR
+  ARCHIVAR
 }
 
 model Usuario {
@@ -70,6 +71,11 @@ model Usuario {
   obligacionesRevisor     ObligacionCliente[] @relation("RevisorDeObligacion")
   obligacionesConfiguradas ObligacionCliente[] @relation("ConfiguradorDeObligacion")
   cronogramasCargados     CronogramaVencimiento[]
+  documentosCreados       Documento[]          @relation("CreadorDeDocumento")
+  documentosArchivados    Documento[]          @relation("ArchivadorDeDocumento")
+  versionesCargadas       VersionDocumento[]
+  carpetasCreadas         Carpeta[]
+  documentosEsperados     DocumentoEsperado[]
 
   @@map("usuarios")
 }
@@ -235,6 +241,7 @@ model Area {
   creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
 
   trabajadores Trabajador[]
+  documentos   Documento[]
 
   @@map("areas")
 }
@@ -328,6 +335,9 @@ model Cliente {
   tareas            Tarea[]
   archivos          Archivo[]
   obligaciones      ObligacionCliente[]
+  documentos        Documento[]
+  carpetas          Carpeta[]
+  documentosEsperados DocumentoEsperado[]
 
   @@index([estado, razonSocial])
   @@map("clientes")
@@ -404,6 +414,9 @@ enum TipoNotificacion {
   OBLIGACION_POR_VENCER
   OBLIGACION_VENCIDA
   CRONOGRAMA_FALTANTE
+  DOCUMENTO_POR_VENCER
+  DOCUMENTO_VENCIDO
+  DOCUMENTACION_FALTANTE
 }
 
 enum DecisionRevision {
@@ -546,6 +559,7 @@ model Archivo {
   subidoPor  Usuario     @relation(fields: [subidoPorId], references: [id])
   evidencias Evidencia[]
   constancias ObligacionPeriodo[]
+  versiones   VersionDocumento[]
 
   @@map("archivos")
 }
@@ -699,4 +713,116 @@ model ObligacionPeriodo {
   @@index([fechaVencimiento])
   @@index([periodo])
   @@map("obligaciones_periodo")
+}
+
+enum Confidencialidad {
+  NORMAL
+  RESTRINGIDO
+}
+
+model TipoDocumento {
+  id                String   @id @default(uuid()) @db.Uuid
+  nombre            String   @unique @db.Citext
+  admiteVencimiento Boolean  @default(false) @map("admite_vencimiento")
+  activo            Boolean  @default(true)
+  creadoEn          DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  documentos Documento[]
+  esperados  DocumentoEsperado[]
+
+  @@map("tipos_documento")
+}
+
+model Carpeta {
+  id          String   @id @default(uuid()) @db.Uuid
+  clienteId   String   @map("cliente_id") @db.Uuid
+  padreId     String?  @map("padre_id") @db.Uuid
+  nombre      String   @db.Citext
+  creadoPorId String   @map("creado_por_id") @db.Uuid
+  creadoEn    DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  cliente    Cliente     @relation(fields: [clienteId], references: [id])
+  padre      Carpeta?    @relation("CarpetasAnidadas", fields: [padreId], references: [id])
+  hijas      Carpeta[]   @relation("CarpetasAnidadas")
+  creadoPor  Usuario     @relation(fields: [creadoPorId], references: [id])
+  documentos Documento[]
+
+  @@index([clienteId, padreId])
+  @@map("carpetas")
+}
+
+model Documento {
+  id               String           @id @default(uuid()) @db.Uuid
+  titulo           String
+  tipoDocumentoId  String           @map("tipo_documento_id") @db.Uuid
+  clienteId        String?          @map("cliente_id") @db.Uuid
+  areaId           String?          @map("area_id") @db.Uuid
+  carpetaId        String?          @map("carpeta_id") @db.Uuid
+  periodo          String?          @db.Char(7)
+  fechaDocumento   DateTime?        @map("fecha_documento") @db.Date
+  fechaVencimiento DateTime?        @map("fecha_vencimiento") @db.Date
+  versionActual    Int              @default(1) @map("version_actual")
+  confidencialidad Confidencialidad @default(NORMAL)
+  creadoPorId      String           @map("creado_por_id") @db.Uuid
+  creadoEn         DateTime         @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn    DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+  archivadoEn      DateTime?        @map("archivado_en") @db.Timestamptz(3)
+  archivadoPorId   String?          @map("archivado_por_id") @db.Uuid
+  motivoArchivo    String?          @map("motivo_archivo")
+
+  tipoDocumento TipoDocumento       @relation(fields: [tipoDocumentoId], references: [id])
+  cliente       Cliente?            @relation(fields: [clienteId], references: [id])
+  area          Area?               @relation(fields: [areaId], references: [id])
+  carpeta       Carpeta?            @relation(fields: [carpetaId], references: [id])
+  creadoPor     Usuario             @relation("CreadorDeDocumento", fields: [creadoPorId], references: [id])
+  archivadoPor  Usuario?            @relation("ArchivadorDeDocumento", fields: [archivadoPorId], references: [id])
+  versiones     VersionDocumento[]
+  esperados     DocumentoEsperado[]
+
+  @@index([clienteId, archivadoEn])
+  @@index([carpetaId])
+  @@index([fechaVencimiento])
+  @@index([tipoDocumentoId])
+  @@map("documentos")
+}
+
+model VersionDocumento {
+  id           String   @id @default(uuid()) @db.Uuid
+  documentoId  String   @map("documento_id") @db.Uuid
+  numero       Int
+  archivoId    String   @map("archivo_id") @db.Uuid
+  nota         String?
+  cargadoPorId String   @map("cargado_por_id") @db.Uuid
+  cargadoEn    DateTime @default(now()) @map("cargado_en") @db.Timestamptz(3)
+
+  documento  Documento @relation(fields: [documentoId], references: [id])
+  archivo    Archivo   @relation(fields: [archivoId], references: [id])
+  cargadoPor Usuario   @relation(fields: [cargadoPorId], references: [id])
+
+  @@unique([documentoId, numero])
+  @@index([archivoId])
+  @@map("versiones_documento")
+}
+
+model DocumentoEsperado {
+  id              String    @id @default(uuid()) @db.Uuid
+  clienteId       String    @map("cliente_id") @db.Uuid
+  tipoDocumentoId String    @map("tipo_documento_id") @db.Uuid
+  periodo         String    @db.Char(7)
+  fechaLimite     DateTime  @map("fecha_limite") @db.Date
+  descripcion     String?
+  documentoId     String?   @map("documento_id") @db.Uuid
+  recibidoEn      DateTime? @map("recibido_en") @db.Timestamptz(3)
+  anuladoEn       DateTime? @map("anulado_en") @db.Timestamptz(3)
+  creadoPorId     String    @map("creado_por_id") @db.Uuid
+  creadoEn        DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  cliente       Cliente       @relation(fields: [clienteId], references: [id])
+  tipoDocumento TipoDocumento @relation(fields: [tipoDocumentoId], references: [id])
+  documento     Documento?    @relation(fields: [documentoId], references: [id])
+  creadoPor     Usuario       @relation(fields: [creadoPorId], references: [id])
+
+  @@index([clienteId, periodo])
+  @@index([fechaLimite])
+  @@map("documentos_esperados")
 }
