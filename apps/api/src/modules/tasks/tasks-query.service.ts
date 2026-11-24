@@ -192,6 +192,8 @@ export class ConsultaTareasService {
         transiciones: { orderBy: { fecha: 'desc' }, include: { usuario: { select: { nombre: true } } } },
         rondas: { orderBy: { numero: 'desc' }, include: { revisor: { select: { id: true, nombre: true } } } },
         obligacion: { select: { id: true } },
+        plantilla: { select: { id: true, nombre: true } },
+        items: { orderBy: { orden: 'asc' }, include: { completadoPor: { select: { nombre: true } } } },
       },
     });
 
@@ -233,6 +235,15 @@ export class ConsultaTareasService {
       version: tarea.version,
       creadoEn: aIso(tarea.creadoEn),
       obligacionId: tarea.obligacion?.id ?? null,
+      plantilla: tarea.plantilla,
+      items: tarea.items.map((item) => ({
+        id: item.id,
+        texto: item.texto,
+        orden: item.orden,
+        completado: item.completadoEn !== null,
+        completadoPor: item.completadoPor?.nombre ?? null,
+        completadoEn: aIsoONulo(item.completadoEn),
+      })),
       avances: tarea.avances.map((avance) => ({
         id: avance.id,
         registradoEn: aIso(avance.registradoEn),
