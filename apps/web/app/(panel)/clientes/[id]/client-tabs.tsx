@@ -12,6 +12,7 @@ interface PropiedadesPestanas {
   verObligaciones: boolean;
   verDocumentos: boolean;
   verAccesos: boolean;
+  verComercial: boolean;
 }
 
 export function PestanasCliente({
@@ -21,6 +22,7 @@ export function PestanasCliente({
   verObligaciones,
   verDocumentos,
   verAccesos,
+  verComercial,
 }: PropiedadesPestanas): ReactNode {
   const ruta = usePathname();
   const base = `/clientes/${clienteId}`;
@@ -32,6 +34,7 @@ export function PestanasCliente({
     ...(verObligaciones ? [{ href: `${base}/obligaciones`, etiqueta: 'Obligaciones' }] : []),
     ...(verDocumentos ? [{ href: `${base}/documentos`, etiqueta: 'Documentos' }] : []),
     ...(verAccesos ? [{ href: `${base}/accesos`, etiqueta: 'Accesos' }] : []),
+    ...(verComercial ? [{ href: `${base}/comercial`, etiqueta: 'Comercial' }] : []),
     { href: `${base}/historial`, etiqueta: 'Historial' },
   ];
 
