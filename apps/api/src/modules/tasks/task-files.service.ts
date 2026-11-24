@@ -66,7 +66,13 @@ export class ArchivosTareaService {
         throw new ForbiddenException({ mensaje: 'No tiene acceso a este archivo.', errores: [] });
       }
     } else if (tareaId === undefined) {
-      if (!usuario.alcanceGlobal) {
+      const asignado =
+        archivo.clienteId !== null &&
+        (await this.prisma.asignacionCliente.count({
+          where: { clienteId: archivo.clienteId, usuarioId: usuario.usuarioId, retiradoEn: null },
+        })) > 0;
+
+      if (!usuario.alcanceGlobal && !asignado) {
         throw new ForbiddenException({ mensaje: 'No tiene acceso a este archivo.', errores: [] });
       }
     } else {
