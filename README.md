@@ -2705,7 +2705,9 @@ Terminado el 23/11/2026; detalle y pendientes en [12.9](#129-sprint-2-personal-c
 | Como Gerencia importo clientes desde Excel | RF-CLI-10 |
 | Catálogos y parámetros base | RF-CFG-01 a 04 |
 
-#### Sprint 3 · Tareas, avances y evidencias
+#### Sprint 3 · Tareas, avances y evidencias ✅
+
+Terminado y publicado el 24/11/2026; detalle y pendientes en [12.10](#1210-sprint-3-tareas-avances-evidencias-y-notificaciones).
 
 | Historia | Requerimientos |
 |---|---|
@@ -2718,7 +2720,9 @@ Terminado el 23/11/2026; detalle y pendientes en [12.9](#129-sprint-2-personal-c
 
 Tareas técnicas: `TaskStateMachine` con pruebas de todas las transiciones, `StorageService`, canal SSE con `LISTEN/NOTIFY`, contenedor `worker`.
 
-#### Sprint 4 · Revisión, tablero y reportes
+#### Sprint 4 · Revisión, tablero y reportes ✅
+
+Terminado y publicado el 24/11/2026; detalle y pendientes en [12.11](#1211-sprint-4-revisión-tablero-historial-y-reportes).
 
 | Historia | Requerimientos |
 |---|---|
@@ -2750,7 +2754,7 @@ Tareas técnicas: `TaskStateMachine` con pruebas de todas las transiciones, `Sto
 
 | Sprint | Alcance | Requerimientos |
 |---|---|---|
-| 5 | Tipos de obligación, configuración por cliente, carga del cronograma oficial por periodo y último dígito, generación mensual de obligaciones con tarea, control mensual cliente × obligación, calendario tributario | RF-TRI-01 a 08, 11, 12, RF-AUTO-02, RF-GER-05 |
+| 5 ✅ | Tipos de obligación, configuración por cliente, carga del cronograma oficial por periodo y último dígito, generación mensual de obligaciones con tarea, control mensual cliente × obligación, calendario tributario. Detalle en [12.12](#1212-sprint-5-obligaciones-tributarias-y-cronograma). | RF-TRI-01 a 08, 11, 12, RF-AUTO-02, RF-GER-05 |
 | 6 | Documentos con tipos, carpetas, versiones, vencimientos, búsqueda, documentación esperada; integración de evidencias y constancias al expediente | RF-DOC-01 a 10, RF-NOT-04 |
 | 7 | Rectificaciones e historial tributario, plantillas y tareas recurrentes, accesos de plataformas, ficha operativa, incidencias, búsqueda general, reportes de clientes | RF-TRI-09, 10, RF-TAR-12, 13, RF-AUTO-01, 07, RF-ACC-01 a 05, RF-CLI-06, 09, RF-BUS-01 a 03, RF-REP-04 |
 
@@ -2799,9 +2803,9 @@ Aspectos que conviene decidir antes de diseñar cada fase, con una recomendació
 | # | Tema | Recomendación | Necesaria antes de |
 |---|---|---|---|
 | D-01 | Stack tecnológico | **Decidido:** el mismo de torresasociados.pe (ver [Stack tecnológico](#71-stack-tecnológico)). | — |
-| D-02 | Bóveda de contraseñas | Bitwarden para equipos o Vaultwarden autoalojado; el sistema guarda solo el identificador de la entrada. | Fase 2 |
+| D-02 | Bóveda de contraseñas | **Decidido (24/11/2026):** bóveda externa (Bitwarden para equipos o Vaultwarden autoalojado); el sistema guarda solo la plataforma, el usuario y el identificador de la entrada, nunca la contraseña. | Fase 2 |
 | D-03 | Revisión de tareas | Revisor por defecto: supervisor inmediato; Gerencia en tareas urgentes o de clientes asignados a Gerencia. Doble aprobación solo para anulaciones financieras. | Fase 1 |
-| D-04 | Calendario tributario | Carga anual manual por Gerencia desde el cronograma oficial publicado, con campo de fuente; actualización ante modificaciones oficiales. | Fase 2 |
+| D-04 | Calendario tributario | **Decidido (24/11/2026):** carga manual por Gerencia desde el cronograma oficial publicado, con campo de fuente; al corregir una fecha se reprograman las obligaciones abiertas. | Fase 2 |
 | D-05 | Almacenamiento de archivos | Disco local del servidor en volumen Docker, 25 MB por archivo, sin cuota por cliente en la versión inicial. | Fase 1 |
 | D-06 | Registro de tiempo | Obligatorio por avance (no por jornada), en minutos. | Fase 1 |
 | D-07 | Facturación | Solo registrar el comprobante emitido en el sistema de facturación actual; sin emisión desde este sistema. | Fase 3 |
@@ -3374,6 +3378,126 @@ El periodo de los indicadores no puede superar un año, y la fecha final no pued
 | RF-GER-01 Filtro por área en indicadores para roles sin `reporte:personal` | Ven su propio alcance sin filtros de equipo. |
 | RF-REP-04 a 06 Reportes de clientes, honorarios y gerencial | Fases 2 a 4, con sus módulos. |
 | Criterio de Fase 1: simulacro de respaldo y restauración | Pendiente de ejecutar y documentar antes del cierre de la fase. |
+
+### 12.12 Sprint 5: obligaciones tributarias y cronograma
+
+**Modelo de datos** (migración `20261126120000_obligaciones_tributarias`):
+
+- **`tipos_obligacion`:** catálogo con código único, uso del cronograma oficial o día fijo de vencimiento (1 a 28 del mes siguiente al periodo) y días de aviso (por defecto 5, 3 y 1; máximo 5 avisos de 1 a 30 días).
+  - Vienen cargados PDT 621, PLAME, RVIE, RCE y libros electrónicos, todos con cronograma oficial.
+  - También vienen Conciliación bancaria y Cálculo de planilla, con plazo interno y **desactivados**: Gerencia define el día y los activa antes de usarlos.
+- **`obligaciones_cliente`:** qué obligación tiene cada cliente, con su responsable, revisor opcional y vigencia (desde y hasta el periodo).
+  - Una sola configuración activa por cliente y tipo (índice único parcial).
+  - El revisor debe ser distinto del responsable; lo exige un CHECK.
+  - Desactivar conserva el historial.
+- **`cronograma_vencimientos`:** una fecha por tipo, periodo, grupo y último dígito del RUC (único), con la fuente oficial y quién la cargó.
+- **`obligaciones_periodo`:** la obligación de un cliente en un periodo, única por configuración y periodo, enlazada 1 a 1 con su tarea.
+  - Guarda la fecha de presentación, el número de orden, la constancia y las observaciones.
+  - Una presentación sin constancia se rechaza en la base (CHECK).
+- **`clientes.grupo_cronograma`:** `GENERAL` o `BUENOS_CONTRIBUYENTES`, que también cubre las UESP, para elegir la columna del cronograma.
+- **Notificaciones nuevas:** `OBLIGACION_POR_VENCER`, `OBLIGACION_VENCIDA` y `CRONOGRAMA_FALTANTE`.
+- **Permisos nuevos**, según la matriz de la sección 3:
+  - `obligacion:ver`: Gerencia, Contabilidad, Asistente contable y Administración.
+  - `obligacion:gestionar` (configurar por cliente y generar el periodo): Gerencia y Contabilidad.
+  - `cronograma:gestionar` (tipos de obligación y cronograma): Gerencia.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `GET /obligaciones/tipos` | `obligacion:ver` | Tipos con el número de clientes que los tienen configurados. |
+| `POST /obligaciones/tipos`, `PUT /obligaciones/tipos/:id`, `POST /obligaciones/tipos/:id/activacion` | `cronograma:gestionar` | Crear, editar, activar o desactivar tipos. |
+| `GET /obligaciones/cronograma?anio=` | `obligacion:ver` | Cronogramas cargados del año, agrupados por tipo, periodo y grupo. |
+| `PUT /obligaciones/cronograma` | `cronograma:gestionar` | Carga o reemplaza las 10 fechas de un tipo, periodo y grupo; devuelve cuántas obligaciones abiertas se reprogramaron. |
+| `GET /obligaciones/clientes/:clienteId` | `obligacion:ver` y cliente visible | Ficha tributaria: RUC, grupo del cronograma y obligaciones configuradas. |
+| `PUT /obligaciones/clientes/:clienteId/grupo` | `obligacion:gestionar` | Cambia el grupo del cronograma. |
+| `POST /obligaciones/clientes/:clienteId`, `PUT …/:obligacionId`, `POST …/:obligacionId/desactivacion` | `obligacion:gestionar` | Configurar, editar o desactivar (con motivo) una obligación del cliente. |
+| `GET /obligaciones?mes=&clienteId=&responsableId=&tipoObligacionId=&estado=` | `obligacion:ver` | Obligaciones que vencen en el mes, dentro del alcance del usuario. |
+| `GET /obligaciones/control?periodo=` | `obligacion:ver` | Matriz cliente × obligación del periodo con totales, vencidas y no generadas. |
+| `GET /obligaciones/indicadores` | `obligacion:ver` | Por vencer en 7 días, vencidas, presentadas y cumplidas del mes, y próximos vencimientos. |
+| `POST /obligaciones/generacion` | `obligacion:gestionar` | Genera el periodo indicado; devuelve generadas, existentes y omitidas con su motivo. |
+| `GET /obligaciones/:id` | `obligacion:ver` y alcance | Detalle con presentación, constancia y aprobación. |
+| `POST /obligaciones/:id/presentacion` | Responsable o colaborador de la tarea | Multipart con la fecha, el número de orden, las observaciones y la constancia (un solo PDF o imagen, hasta 25 MB). |
+
+**Reglas implementadas**
+
+- **Alcance:** Gerencia ve todo. Con alcance asignado se ven las obligaciones de los clientes asignados más las propias como responsable o revisor; con alcance propio, solo las propias. Un acceso fuera de alcance devuelve 403 y queda como `PERMISO_DENEGADO`.
+- **Configuración (RF-TRI-02):**
+  - El responsable y el revisor deben estar activos y asignados al cliente, salvo los roles con alcance global.
+  - El revisor necesita `tarea:revisar`.
+  - Las obligaciones con cronograma exigen que el cliente tenga RUC.
+- **Cronograma (RF-TRI-03, D-04):**
+  - Se cargan las 10 fechas a la vez, con la fuente oficial, y ninguna puede ser anterior al periodo.
+  - Las fechas nunca se calculan con una regla fija.
+  - Al corregir un cronograma ya cargado, se reprograman la obligación y la fecha límite de su tarea, solo en las que siguen abiertas y sin presentar.
+- **Generación (RF-TRI-04, RF-AUTO-02):**
+  - El worker genera todos los días a las 06:00 (hora de Lima) el periodo del mes anterior. Gerencia y Contabilidad pueden generar cualquier periodo desde el control mensual.
+  - Cada obligación nace con una tarea de prioridad alta, que vence en la fecha de la obligación, exige la constancia como evidencia y requiere aprobación si hay revisor.
+  - Se avisa al responsable y al revisor.
+  - Generar dos veces no duplica nada (índice único y comprobación previa).
+- **Omisiones (RF-TRI-12):**
+  - No se genera con fechas supuestas. Se omite la obligación y se informa el motivo: falta el cronograma, el cliente no tiene RUC, o el responsable o el revisor ya no está asignado o está inactivo.
+  - Si falta el cronograma, Gerencia recibe `CRONOGRAMA_FALTANTE` una sola vez por tipo, periodo y grupo.
+- **Presentación (RF-TRI-05 y 06):**
+  - Solo con la constancia: un archivo PDF o imagen, verificado por su contenido y no por la extensión.
+  - La fecha de presentación no puede ser futura ni anterior al periodo.
+  - Se registra como avance al 100 % de la tarea, con la constancia como evidencia, en la misma transacción que actualiza la obligación.
+  - Después se envía la tarea a revisión o, sin revisor, queda finalizada.
+  - Una obligación observada se corrige registrando otra presentación, que reenvía la tarea a revisión.
+- **Estado:** se deriva de la tarea y no se guarda aparte, así no se desincroniza.
+  - Pendiente, En proceso, Presentada (en revisión), Observada, Cumplida (aprobada o finalizada) y Anulada (tarea cancelada).
+  - «Vencida» se calcula: sin presentar y con la fecha de vencimiento pasada.
+- **Aprobación:** es la revisión de la tarea; el detalle muestra quién aprobó y cuándo.
+- **Alertas (RF-TRI-08):**
+  - Cada hora (minuto 15) se avisa al responsable y al revisor en los días configurados del tipo, una vez por día de aviso.
+  - El vencimiento se avisa una sola vez.
+  - Se omiten las obligaciones ya presentadas o cerradas.
+- **Tareas:** el detalle de una tarea generada por una obligación enlaza a la obligación para registrar ahí la presentación.
+
+**Pantallas web:**
+
+- **Obligaciones:** calendario del mes y lista con filtros por cliente, responsable, tipo y estado, más el control mensual.
+  - El control muestra la matriz cliente × obligación, los totales por estado y las vencidas, el aviso de las no generadas y el formulario para generar el periodo.
+- **Detalle de la obligación:** datos, presentación con enlace a la constancia, aprobación, enlace a la tarea y formulario de presentación o de corrección.
+- **Expediente del cliente → Obligaciones:** obligaciones configuradas con edición y desactivación con motivo, el formulario para configurar otra (responsable y revisor del equipo del cliente) y el grupo del cronograma.
+- **Cronograma tributario:** cronogramas del año, el aviso de los periodos generales que faltan cargar y el formulario de carga o edición de las 10 fechas.
+- **Tipos de obligación** (Administración): catálogo con creación, edición y activación.
+- **Inicio (RF-GER-05):** obligaciones por vencer y vencidas, presentadas y cumplidas del mes, y los próximos vencimientos.
+
+**Verificación realizada:** typecheck, lint, 71 pruebas unitarias (12 nuevas de periodos, vencimientos, dígito del RUC, estado, vencida y alertas) y build. La migración se aplicó sobre las anteriores y el esquema no queda con diferencias. Contra un stack desechable con PostgreSQL real se probaron:
+
+- **Configuración:**
+  - Responsable no asignado al cliente: 400.
+  - Revisor sin `tarea:revisar`: 400.
+  - Configuración duplicada: 409.
+  - Asistente sin `obligacion:gestionar`: 403.
+- **Sin cronograma:** generar el periodo 2026-10 omitió las 2 obligaciones con su dígito, y Gerencia recibió `CRONOGRAMA_FALTANTE`.
+- **Cronograma:**
+  - Contabilidad recibió 403 al cargarlo.
+  - Las fechas incompletas se rechazaron.
+  - La carga de Gerencia permitió generar 2 obligaciones; repetir la generación dio 0 nuevas y 2 existentes.
+  - Al corregir la fecha del dígito 5 se reprogramó 1 obligación abierta y su tarea.
+- **Alcance:** la asistente solo vio la obligación de su cliente y recibió 403 en la del otro.
+- **Presentación:**
+  - Se rechazaron: sin constancia, con un archivo de texto disfrazado de PDF, con fecha futura y por la revisora (403).
+  - Con el PDF quedó Presentada; repetir mientras estaba en revisión dio 409.
+  - La observación la dejó Observada; la corrección la volvió a Presentada y la aprobación a Cumplida, con fecha, número de orden, constancia descargable (PDF) y aprobación.
+- **Sin revisor:** la presentación dejó la obligación Cumplida y la tarea Finalizada.
+- **Control e indicadores:** el control 2026-10 cuadró (1 pendiente y vencida, 1 cumplida), y los indicadores de la asistente y de Gerencia coincidieron con los datos.
+- **Worker:**
+  - La generación diaria creó sola la obligación de un tipo de plazo interno.
+  - La alerta a 3 días llegó al responsable y a la revisora, y no se duplicó al volver a correr.
+- **Auditoría:** creaciones, modificaciones, presentaciones, cronogramas y el acceso denegado quedaron registrados.
+- **Web:** Inicio, calendario, lista, control, detalle, pestaña del cliente, tipos, cronograma y el aviso en la tarea se renderizaron con datos reales.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| RF-TRI-09 y 10 Rectificaciones e historial tributario | Sprint 7. |
+| Importar el cronograma desde Excel | La carga es manual por periodo, según D-04; un importador se puede sumar si Gerencia lo pide. |
+| Constancias en el módulo de documentos (RF-DOC, RF-NOT-04) | Sprint 6; hoy la constancia vive como evidencia de la tarea. |
+| Avisos por correo | Fase 5 (SMTP). |
 
 ---
 
