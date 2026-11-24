@@ -36,6 +36,10 @@ export function fechaHoyEnLima(): string {
   return FORMATO_FECHA_LIMA.format(new Date());
 }
 
+export function fechaEnLima(fecha: Date): string {
+  return FORMATO_FECHA_LIMA.format(fecha);
+}
+
 export function aFechaDb(fecha: string): Date {
   return new Date(`${fecha}T00:00:00.000Z`);
 }
