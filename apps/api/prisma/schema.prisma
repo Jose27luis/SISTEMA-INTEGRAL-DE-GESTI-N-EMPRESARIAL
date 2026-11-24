@@ -58,6 +58,7 @@ model Usuario {
   asignacionesRetiradas AsignacionCliente[] @relation("AsignacionesRetiradasPor")
   tareasResponsable    Tarea[]              @relation("ResponsableDeTarea")
   tareasRevisor        Tarea[]              @relation("RevisorDeTarea")
+  rondasRevision       RondaRevision[]
   tareasAsignadas      Tarea[]              @relation("AsignadorDeTarea")
   colaboraciones       TareaColaborador[]
   transiciones         TransicionTarea[]
@@ -390,6 +391,15 @@ enum TipoNotificacion {
   AVANCE_REGISTRADO
   MENCION
   TAREA_REASIGNADA
+  TAREA_POR_REVISAR
+  TRABAJO_OBSERVADO
+  TRABAJO_APROBADO
+  TAREA_CANCELADA
+}
+
+enum DecisionRevision {
+  APROBADA
+  OBSERVADA
 }
 
 enum ResultadoEjecucion {
@@ -417,6 +427,7 @@ model Tarea {
   porcentajeAvance   Int         @default(0) @map("porcentaje_avance")
   minutosRegistrados Int         @default(0) @map("minutos_registrados")
   motivoCancelacion  String?     @map("motivo_cancelacion")
+  completadaEn       DateTime?   @map("completada_en") @db.Timestamptz(3)
   version            Int         @default(1)
   creadoEn           DateTime    @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn      DateTime    @updatedAt @map("actualizado_en") @db.Timestamptz(3)
@@ -429,8 +440,10 @@ model Tarea {
   transiciones  TransicionTarea[]
   avances       Avance[]
   comentarios   ComentarioTarea[]
+  rondas        RondaRevision[]
 
   @@index([responsableId, estado, fechaLimite])
+  @@index([completadaEn])
   @@index([clienteId, estado])
   @@index([estado, fechaLimite])
   @@map("tareas")
@@ -465,6 +478,23 @@ model TransicionTarea {
 
   @@index([tareaId, fecha])
   @@map("transiciones_tarea")
+}
+
+model RondaRevision {
+  id         String           @id @default(uuid()) @db.Uuid
+  tareaId    String           @map("tarea_id") @db.Uuid
+  numero     Int
+  revisorId  String           @map("revisor_id") @db.Uuid
+  decision   DecisionRevision
+  comentario String?
+  fecha      DateTime         @default(now()) @db.Timestamptz(3)
+
+  tarea   Tarea   @relation(fields: [tareaId], references: [id])
+  revisor Usuario @relation(fields: [revisorId], references: [id])
+
+  @@unique([tareaId, numero])
+  @@index([fecha])
+  @@map("rondas_revision")
 }
 
 model Avance {
