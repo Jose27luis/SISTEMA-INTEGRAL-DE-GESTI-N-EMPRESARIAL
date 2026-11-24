@@ -66,6 +66,10 @@ model Usuario {
   archivosSubidos      Archivo[]
   comentarios          ComentarioTarea[]
   notificaciones       Notificacion[]
+  obligacionesResponsable ObligacionCliente[] @relation("ResponsableDeObligacion")
+  obligacionesRevisor     ObligacionCliente[] @relation("RevisorDeObligacion")
+  obligacionesConfiguradas ObligacionCliente[] @relation("ConfiguradorDeObligacion")
+  cronogramasCargados     CronogramaVencimiento[]
 
   @@map("usuarios")
 }
@@ -311,6 +315,7 @@ model Cliente {
   fechaIncorporacion  DateTime      @map("fecha_incorporacion") @db.Date
   estado              EstadoCliente @default(ACTIVO)
   responsableId       String?       @map("responsable_id") @db.Uuid
+  grupoCronograma     GrupoCronograma @default(GENERAL) @map("grupo_cronograma")
   creadoPorId         String?       @map("creado_por_id") @db.Uuid
   creadoEn            DateTime      @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn       DateTime      @updatedAt @map("actualizado_en") @db.Timestamptz(3)
@@ -322,6 +327,7 @@ model Cliente {
   asignaciones      AsignacionCliente[]
   tareas            Tarea[]
   archivos          Archivo[]
+  obligaciones      ObligacionCliente[]
 
   @@index([estado, razonSocial])
   @@map("clientes")
@@ -395,6 +401,9 @@ enum TipoNotificacion {
   TRABAJO_OBSERVADO
   TRABAJO_APROBADO
   TAREA_CANCELADA
+  OBLIGACION_POR_VENCER
+  OBLIGACION_VENCIDA
+  CRONOGRAMA_FALTANTE
 }
 
 enum DecisionRevision {
@@ -441,6 +450,7 @@ model Tarea {
   avances       Avance[]
   comentarios   ComentarioTarea[]
   rondas        RondaRevision[]
+  obligacion    ObligacionPeriodo?
 
   @@index([responsableId, estado, fechaLimite])
   @@index([completadaEn])
@@ -535,6 +545,7 @@ model Archivo {
   cliente    Cliente?    @relation(fields: [clienteId], references: [id])
   subidoPor  Usuario     @relation(fields: [subidoPorId], references: [id])
   evidencias Evidencia[]
+  constancias ObligacionPeriodo[]
 
   @@map("archivos")
 }
@@ -597,4 +608,95 @@ model EjecucionProceso {
 
   @@index([proceso, inicio])
   @@map("ejecuciones_proceso")
+}
+
+enum GrupoCronograma {
+  GENERAL
+  BUENOS_CONTRIBUYENTES
+}
+
+model TipoObligacion {
+  id             String   @id @default(uuid()) @db.Uuid
+  codigo         String   @unique @db.Citext
+  nombre         String
+  descripcion    String?
+  usaCronograma  Boolean  @default(true) @map("usa_cronograma")
+  diaVencimiento Int?     @map("dia_vencimiento")
+  diasAlerta     Int[]    @default([5, 3, 1]) @map("dias_alerta")
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn  DateTime @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  obligaciones ObligacionCliente[]
+  cronogramas  CronogramaVencimiento[]
+
+  @@map("tipos_obligacion")
+}
+
+model ObligacionCliente {
+  id               String    @id @default(uuid()) @db.Uuid
+  clienteId        String    @map("cliente_id") @db.Uuid
+  tipoObligacionId String    @map("tipo_obligacion_id") @db.Uuid
+  responsableId    String    @map("responsable_id") @db.Uuid
+  revisorId        String?   @map("revisor_id") @db.Uuid
+  desdePeriodo     String    @map("desde_periodo") @db.Char(7)
+  hastaPeriodo     String?   @map("hasta_periodo") @db.Char(7)
+  activo           Boolean   @default(true)
+  configuradoPorId String    @map("configurado_por_id") @db.Uuid
+  creadoEn         DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn    DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  cliente        Cliente             @relation(fields: [clienteId], references: [id])
+  tipoObligacion TipoObligacion      @relation(fields: [tipoObligacionId], references: [id])
+  responsable    Usuario             @relation("ResponsableDeObligacion", fields: [responsableId], references: [id])
+  revisor        Usuario?            @relation("RevisorDeObligacion", fields: [revisorId], references: [id])
+  configuradoPor Usuario             @relation("ConfiguradorDeObligacion", fields: [configuradoPorId], references: [id])
+  periodos       ObligacionPeriodo[]
+
+  @@index([clienteId, activo])
+  @@index([tipoObligacionId, activo])
+  @@map("obligaciones_cliente")
+}
+
+model CronogramaVencimiento {
+  id               String          @id @default(uuid()) @db.Uuid
+  tipoObligacionId String          @map("tipo_obligacion_id") @db.Uuid
+  periodo          String          @db.Char(7)
+  grupo            GrupoCronograma
+  ultimoDigito     Int             @map("ultimo_digito") @db.SmallInt
+  fechaVencimiento DateTime        @map("fecha_vencimiento") @db.Date
+  fuente           String
+  cargadoPorId     String          @map("cargado_por_id") @db.Uuid
+  cargadoEn        DateTime        @default(now()) @map("cargado_en") @db.Timestamptz(3)
+  actualizadoEn    DateTime        @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  tipoObligacion TipoObligacion @relation(fields: [tipoObligacionId], references: [id])
+  cargadoPor     Usuario        @relation(fields: [cargadoPorId], references: [id])
+
+  @@unique([tipoObligacionId, periodo, grupo, ultimoDigito])
+  @@index([periodo])
+  @@map("cronograma_vencimientos")
+}
+
+model ObligacionPeriodo {
+  id                  String    @id @default(uuid()) @db.Uuid
+  obligacionClienteId String    @map("obligacion_cliente_id") @db.Uuid
+  periodo             String    @db.Char(7)
+  fechaVencimiento    DateTime  @map("fecha_vencimiento") @db.Date
+  tareaId             String    @unique @map("tarea_id") @db.Uuid
+  fechaPresentacion   DateTime? @map("fecha_presentacion") @db.Date
+  numeroOrden         String?   @map("numero_orden")
+  constanciaId        String?   @map("constancia_id") @db.Uuid
+  observaciones       String?
+  generadaEn          DateTime  @default(now()) @map("generada_en") @db.Timestamptz(3)
+  actualizadoEn       DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  obligacionCliente ObligacionCliente @relation(fields: [obligacionClienteId], references: [id])
+  tarea             Tarea             @relation(fields: [tareaId], references: [id])
+  constancia        Archivo?          @relation(fields: [constanciaId], references: [id])
+
+  @@unique([obligacionClienteId, periodo])
+  @@index([fechaVencimiento])
+  @@index([periodo])
+  @@map("obligaciones_periodo")
 }
