@@ -14,6 +14,10 @@ export type IconoNavegacion =
   | 'tipos-obligacion'
   | 'documentos'
   | 'tipos-documento'
+  | 'recurrentes'
+  | 'plantillas'
+  | 'reporte-clientes'
+  | 'procesos'
   | 'clientes'
   | 'personal'
   | 'usuarios'
@@ -49,6 +53,12 @@ export const NAVEGACION: GrupoNavegacion[] = [
     elementos: [
       { ruta: '/tareas', etiqueta: 'Tareas', icono: 'tareas', permiso: 'tarea:ver' },
       { ruta: '/por-revisar', etiqueta: 'Por revisar', icono: 'por-revisar', permiso: 'tarea:revisar' },
+      {
+        ruta: '/tareas/recurrentes',
+        etiqueta: 'Tareas recurrentes',
+        icono: 'recurrentes',
+        permiso: 'plantilla:gestionar',
+      },
       { ruta: '/obligaciones', etiqueta: 'Obligaciones', icono: 'obligaciones', permiso: 'obligacion:ver' },
       {
         ruta: '/configuracion/cronograma',
@@ -60,6 +70,12 @@ export const NAVEGACION: GrupoNavegacion[] = [
       { ruta: '/clientes', etiqueta: 'Clientes', icono: 'clientes', permiso: 'cliente:ver' },
       { ruta: '/personal', etiqueta: 'Personal', icono: 'personal', permiso: 'personal:ver' },
       { ruta: '/reportes', etiqueta: 'Reportes', icono: 'reportes', permiso: 'reporte:personal' },
+      {
+        ruta: '/reportes/clientes',
+        etiqueta: 'Reporte de clientes',
+        icono: 'reporte-clientes',
+        permiso: 'reporte:clientes',
+      },
     ],
   },
   {
@@ -85,7 +101,19 @@ export const NAVEGACION: GrupoNavegacion[] = [
         icono: 'tipos-documento',
         permiso: 'catalogo:gestionar',
       },
+      {
+        ruta: '/configuracion/plantillas',
+        etiqueta: 'Plantillas de tareas',
+        icono: 'plantillas',
+        permiso: 'plantilla:gestionar',
+      },
       { ruta: '/auditoria', etiqueta: 'Auditoría', icono: 'auditoria', permiso: 'auditoria:ver' },
+      {
+        ruta: '/configuracion/procesos',
+        etiqueta: 'Procesos automáticos',
+        icono: 'procesos',
+        permiso: 'auditoria:ver',
+      },
     ],
   },
 ];
