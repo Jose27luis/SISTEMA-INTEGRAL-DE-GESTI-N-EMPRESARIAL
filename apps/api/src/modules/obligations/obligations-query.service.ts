@@ -5,7 +5,9 @@ import {
   ESTADOS_CERRADOS,
   ESTADOS_OBLIGACION,
   type EstadoObligacion,
+  type EstadoTarea,
   type FiltroObligaciones,
+  type HistorialTributario,
   type IndicadoresTributarios,
   type ListaObligaciones,
   type ObligacionDetalle,
@@ -16,6 +18,7 @@ import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/auth
 import { aFechaDb, aFechaIso, aFechaIsoONula, aIso, fechaHoyEnLima, inicioDelDiaEnLima } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { actorDesde, AuditoriaService } from '../audit/audit.service';
+import { AccesoClientesService } from '../clients/client-access.service';
 import { aplicaEnPeriodo, desplazarPeriodo, estadoObligacion, estaVencida } from './obligation-rules';
 
 const DIAS_POR_VENCER = 7;
@@ -46,6 +49,19 @@ function sumarDias(fecha: string, dias: number): string {
   return aFechaIso(resultado);
 }
 
+export function puedeRectificar(
+  usuario: UsuarioAutenticado,
+  ejecutores: readonly string[],
+  presentada: boolean,
+  estadoTarea: EstadoTarea,
+): boolean {
+  return (
+    presentada &&
+    (estadoTarea === 'APROBADA' || estadoTarea === 'FINALIZADA') &&
+    (ejecutores.includes(usuario.usuarioId) || usuario.permisos.has('obligacion:gestionar'))
+  );
+}
+
 export function aResumen(obligacion: ObligacionConRelaciones, hoy: string): ObligacionResumen {
   const estado = estadoObligacion(obligacion.tarea.estado, obligacion.fechaPresentacion !== null);
   const fechaVencimiento = aFechaIso(obligacion.fechaVencimiento);
@@ -71,6 +87,7 @@ export class ConsultaObligacionesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly accesoClientes: AccesoClientesService,
   ) {}
 
   filtroVisible(usuario: UsuarioAutenticado): Prisma.ObligacionClienteWhereInput {
@@ -249,7 +266,7 @@ export class ConsultaObligacionesService {
   async detalle(id: string, usuario: UsuarioAutenticado, contexto: ContextoCliente): Promise<ObligacionDetalle> {
     const obligacion = await this.obtenerVisible(id, usuario, contexto);
     const hoy = fechaHoyEnLima();
-    const [constancia, aprobacion, colaboradores] = await Promise.all([
+    const [constancia, aprobacion, colaboradores, rectificaciones] = await Promise.all([
       obligacion.constanciaId === null
         ? null
         : this.prisma.archivo.findUnique({
@@ -264,6 +281,14 @@ export class ConsultaObligacionesService {
       this.prisma.tareaColaborador.findMany({
         where: { tareaId: obligacion.tareaId, retiradoEn: null },
         select: { usuarioId: true },
+      }),
+      this.prisma.rectificacion.findMany({
+        where: { obligacionPeriodoId: id },
+        orderBy: { registradoEn: 'desc' },
+        include: {
+          constancia: { select: { id: true, nombreOriginal: true, tamanoBytes: true } },
+          registradoPor: { select: { nombre: true } },
+        },
       }),
     ]);
     const resumen = aResumen(obligacion, hoy);
@@ -286,6 +311,57 @@ export class ConsultaObligacionesService {
         ejecutores.includes(usuario.usuarioId) &&
         !ESTADOS_CERRADOS.includes(obligacion.tarea.estado) &&
         obligacion.tarea.estado !== 'EN_REVISION',
+      rectificaciones: rectificaciones.map((rectificacion) => ({
+        id: rectificacion.id,
+        motivo: rectificacion.motivo,
+        fechaPresentacion: aFechaIso(rectificacion.fechaPresentacion),
+        numeroOrden: rectificacion.numeroOrden,
+        constancia: {
+          id: rectificacion.constancia.id,
+          nombre: rectificacion.constancia.nombreOriginal,
+          tamanoBytes: rectificacion.constancia.tamanoBytes,
+        },
+        registradoPor: rectificacion.registradoPor.nombre,
+        registradoEn: aIso(rectificacion.registradoEn),
+      })),
+      puedeRectificar: puedeRectificar(usuario, ejecutores, obligacion.fechaPresentacion !== null, obligacion.tarea.estado),
+    };
+  }
+
+  async historial(clienteId: string, usuario: UsuarioAutenticado, contexto: ContextoCliente): Promise<HistorialTributario> {
+    await this.accesoClientes.asegurarAcceso(usuario, clienteId, contexto);
+    const hoy = fechaHoyEnLima();
+    const obligaciones = await this.prisma.obligacionPeriodo.findMany({
+      where: { obligacionCliente: { AND: [{ clienteId }, this.filtroVisible(usuario)] } },
+      include: {
+        ...INCLUSION_RESUMEN,
+        constancia: { select: { id: true, nombreOriginal: true } },
+        rectificaciones: {
+          orderBy: { registradoEn: 'asc' },
+          include: { constancia: { select: { id: true, nombreOriginal: true } } },
+        },
+      },
+      orderBy: [{ periodo: 'desc' }, { obligacionCliente: { tipoObligacion: { nombre: 'asc' } } }],
+    });
+
+    return {
+      clienteId,
+      periodos: obligaciones.map((obligacion) => ({
+        ...aResumen(obligacion, hoy),
+        numeroOrden: obligacion.numeroOrden,
+        observaciones: obligacion.observaciones,
+        constancia:
+          obligacion.constancia === null
+            ? null
+            : { id: obligacion.constancia.id, nombre: obligacion.constancia.nombreOriginal },
+        rectificaciones: obligacion.rectificaciones.map((rectificacion) => ({
+          id: rectificacion.id,
+          motivo: rectificacion.motivo,
+          fechaPresentacion: aFechaIso(rectificacion.fechaPresentacion),
+          numeroOrden: rectificacion.numeroOrden,
+          constancia: { id: rectificacion.constancia.id, nombre: rectificacion.constancia.nombreOriginal },
+        })),
+      })),
     };
   }
 
