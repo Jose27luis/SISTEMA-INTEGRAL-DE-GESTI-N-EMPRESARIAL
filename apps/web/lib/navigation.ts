@@ -12,6 +12,8 @@ export type IconoNavegacion =
   | 'obligaciones'
   | 'cronograma'
   | 'tipos-obligacion'
+  | 'documentos'
+  | 'tipos-documento'
   | 'clientes'
   | 'personal'
   | 'usuarios'
@@ -54,6 +56,7 @@ export const NAVEGACION: GrupoNavegacion[] = [
         icono: 'cronograma',
         permiso: 'obligacion:ver',
       },
+      { ruta: '/documentos', etiqueta: 'Documentos', icono: 'documentos', permiso: 'documento:ver' },
       { ruta: '/clientes', etiqueta: 'Clientes', icono: 'clientes', permiso: 'cliente:ver' },
       { ruta: '/personal', etiqueta: 'Personal', icono: 'personal', permiso: 'personal:ver' },
       { ruta: '/reportes', etiqueta: 'Reportes', icono: 'reportes', permiso: 'reporte:personal' },
@@ -75,6 +78,12 @@ export const NAVEGACION: GrupoNavegacion[] = [
         etiqueta: 'Tipos de obligación',
         icono: 'tipos-obligacion',
         permiso: 'cronograma:gestionar',
+      },
+      {
+        ruta: '/configuracion/tipos-documento',
+        etiqueta: 'Tipos de documento',
+        icono: 'tipos-documento',
+        permiso: 'catalogo:gestionar',
       },
       { ruta: '/auditoria', etiqueta: 'Auditoría', icono: 'auditoria', permiso: 'auditoria:ver' },
     ],
