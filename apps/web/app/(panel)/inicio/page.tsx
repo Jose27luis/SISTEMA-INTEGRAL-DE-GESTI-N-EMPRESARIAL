@@ -1,5 +1,6 @@
 import {
   esquemaIndicadoresDocumentales,
+  esquemaIndicadoresFinancieros,
   esquemaIndicadoresTributarios,
   esquemaOpcionesTarea,
   esquemaTablero,
@@ -15,7 +16,14 @@ import { EncabezadoPagina } from '@/components/page-header';
 import { FiltroPeriodo } from '@/components/period-filter';
 import { solicitarApi } from '@/lib/api';
 import { opcionesCatalogo } from '@/lib/catalog-options';
-import { fechaHoyEnLima, formatearFecha, formatearFechaHora, formatearMinutos } from '@/lib/format';
+import {
+  fechaHoyEnLima,
+  formatearFecha,
+  formatearFechaHora,
+  formatearMinutos,
+  formatearMoneda,
+  formatearPeriodo,
+} from '@/lib/format';
 import { navegacionPermitida } from '@/lib/navigation';
 import { leerRango } from '@/lib/periods';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
@@ -109,7 +117,7 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
     consulta.set('usuarioId', usuarioId);
   }
 
-  const [tablero, areas, opciones, tributario, documental] = await Promise.all([
+  const [tablero, areas, opciones, tributario, documental, financiero] = await Promise.all([
     solicitarApi(`/tablero?${consulta.toString()}`, { esquema: esquemaTablero }),
     verEquipo ? opcionesCatalogo('areas') : Promise.resolve(undefined),
     verEquipo ? solicitarApi('/tareas/opciones', { esquema: esquemaOpcionesTarea }) : Promise.resolve(null),
@@ -118,6 +126,9 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
       : Promise.resolve(null),
     tienePermiso(perfil, 'documento:ver')
       ? solicitarApi('/documentos/indicadores', { esquema: esquemaIndicadoresDocumentales })
+      : Promise.resolve(null),
+    tienePermiso(perfil, 'finanza:ingresos')
+      ? solicitarApi('/finanzas/indicadores', { esquema: esquemaIndicadoresFinancieros })
       : Promise.resolve(null),
   ]);
 
@@ -226,6 +237,36 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
                 />
               </section>
             )}
+
+            {financiero?.ok === true ? (
+              <section aria-label="Indicadores financieros" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Indicador
+                  etiqueta="Facturado del mes"
+                  valor={formatearMoneda(financiero.datos.facturadoMes)}
+                  detalle={formatearPeriodo(financiero.datos.periodo)}
+                  enlace={`/finanzas/ingresos?periodo=${financiero.datos.periodo}`}
+                />
+                <Indicador
+                  etiqueta="Cobrado del mes"
+                  valor={formatearMoneda(financiero.datos.cobradoMes)}
+                  detalle="Cobros registrados"
+                  tono="exito"
+                />
+                <Indicador
+                  etiqueta="Por cobrar"
+                  valor={formatearMoneda(financiero.datos.porCobrar)}
+                  detalle="Saldo total pendiente"
+                  enlace="/reportes/finanzas?vista=cobrar"
+                />
+                <Indicador
+                  etiqueta="Vencido"
+                  valor={formatearMoneda(financiero.datos.vencido)}
+                  detalle={`${String(financiero.datos.clientesMorosos)} ${financiero.datos.clientesMorosos === 1 ? 'cliente' : 'clientes'} con atraso`}
+                  enlace="/finanzas/ingresos?vencidos=si"
+                  tono={financiero.datos.vencido > 0 ? 'alerta' : 'normal'}
+                />
+              </section>
+            ) : null}
 
             {tributario?.ok === true ? (
               <section aria-label="Obligaciones tributarias" className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
