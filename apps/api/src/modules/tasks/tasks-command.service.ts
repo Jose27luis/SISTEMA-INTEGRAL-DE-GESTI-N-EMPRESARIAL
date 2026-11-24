@@ -64,8 +64,14 @@ export class GestionTareasService {
     const tareaId = await this.prisma.$transaction(async (tx) => {
       const codigo = await generarCodigoTarea(tx);
       const tarea = await tx.tarea.create({
-        data: { ...datosTarea(entrada), codigo, asignadoPorId: usuario.usuarioId },
+        data: { ...datosTarea(entrada), codigo, asignadoPorId: usuario.usuarioId, plantillaId: entrada.plantillaId },
       });
+
+      if (entrada.items.length > 0) {
+        await tx.itemVerificacion.createMany({
+          data: entrada.items.map((texto, orden) => ({ tareaId: tarea.id, texto, orden })),
+        });
+      }
 
       if (colaboradorIds.length > 0) {
         await tx.tareaColaborador.createMany({
@@ -320,6 +326,17 @@ export class GestionTareasService {
   }
 
   private async validar(entrada: TareaEntrada, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
+    if (entrada.plantillaId !== null) {
+      const plantilla = await db.plantillaTarea.findUnique({ where: { id: entrada.plantillaId }, select: { activo: true } });
+
+      if (plantilla?.activo !== true) {
+        throw new BadRequestException({
+          mensaje: 'Revise los datos ingresados.',
+          errores: [{ campo: 'plantillaId', mensaje: 'La plantilla no existe o está desactivada.' }],
+        });
+      }
+    }
+
     if (entrada.clienteId !== null) {
       const cliente = await db.cliente.findUnique({
         where: { id: entrada.clienteId },
