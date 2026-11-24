@@ -18,6 +18,10 @@ export type IconoNavegacion =
   | 'plantillas'
   | 'reporte-clientes'
   | 'procesos'
+  | 'ingresos'
+  | 'egresos'
+  | 'reportes-financieros'
+  | 'catalogos-financieros'
   | 'clientes'
   | 'personal'
   | 'usuarios'
@@ -79,8 +83,27 @@ export const NAVEGACION: GrupoNavegacion[] = [
     ],
   },
   {
+    titulo: 'Finanzas',
+    elementos: [
+      { ruta: '/finanzas/ingresos', etiqueta: 'Ingresos y cobranza', icono: 'ingresos', permiso: 'comercial:ver' },
+      { ruta: '/finanzas/egresos', etiqueta: 'Egresos', icono: 'egresos', permiso: 'finanza:egresos' },
+      {
+        ruta: '/reportes/finanzas',
+        etiqueta: 'Reportes financieros',
+        icono: 'reportes-financieros',
+        permiso: 'finanza:ingresos',
+      },
+    ],
+  },
+  {
     titulo: 'Administración',
     elementos: [
+      {
+        ruta: '/configuracion/finanzas',
+        etiqueta: 'Catálogos financieros',
+        icono: 'catalogos-financieros',
+        permiso: 'finanza:catalogos',
+      },
       { ruta: '/configuracion/usuarios', etiqueta: 'Usuarios', icono: 'usuarios', permiso: 'usuario:ver' },
       { ruta: '/configuracion/roles', etiqueta: 'Roles y permisos', icono: 'roles', permiso: 'rol:ver' },
       {
