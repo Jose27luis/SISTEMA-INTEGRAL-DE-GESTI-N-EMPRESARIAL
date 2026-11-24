@@ -67,6 +67,7 @@ export default async function LayoutCliente({ children, params }: PropiedadesLay
         verObligaciones={tienePermiso(perfil, 'obligacion:ver')}
         verDocumentos={tienePermiso(perfil, 'documento:ver')}
         verAccesos={tienePermiso(perfil, 'acceso:ver')}
+        verComercial={tienePermiso(perfil, 'comercial:ver')}
       />
       {children}
     </>
