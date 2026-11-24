@@ -23,12 +23,14 @@ import {
   esquemaObligacionClienteEntrada,
   esquemaPeriodo,
   esquemaPresentacionEntrada,
+  esquemaRectificacionEntrada,
   esquemaTipoObligacionEntrada,
   type FichaTributaria,
   type FiltroCronograma,
   type FiltroObligaciones,
   type GeneracionEntrada,
   type GrupoClienteEntrada,
+  type HistorialTributario,
   type IndicadoresTributarios,
   type ListaCronograma,
   type ListaObligaciones,
@@ -37,6 +39,7 @@ import {
   type ObligacionDetalle,
   type OpcionesObligaciones,
   type PresentacionEntrada,
+  type RectificacionEntrada,
   type ResultadoGeneracion,
   TAMANO_MAXIMO_CONSTANCIA_MB,
   type TipoObligacion,
@@ -136,6 +139,16 @@ export class ObligacionesController {
     @Cliente() cliente: ContextoCliente,
   ): Promise<FichaTributaria> {
     return this.delCliente.ficha(clienteId, usuario, cliente);
+  }
+
+  @Get('clientes/:clienteId/historial')
+  @RequierePermiso('obligacion:ver')
+  historialTributario(
+    @Param('clienteId', validarId) clienteId: string,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<HistorialTributario> {
+    return this.consulta.historial(clienteId, usuario, cliente);
   }
 
   @Put('clientes/:clienteId/grupo')
@@ -253,6 +266,33 @@ export class ObligacionesController {
     @Cliente() cliente: ContextoCliente,
   ): Promise<ObligacionDetalle> {
     await this.presentacion.presentar(
+      id,
+      datos,
+      (archivos ?? []).map((archivo) => ({
+        nombre: Buffer.from(archivo.originalname, 'latin1').toString('utf8'),
+        contenido: archivo.buffer,
+      })),
+      usuario,
+      cliente,
+    );
+    return this.consulta.detalle(id, usuario, cliente);
+  }
+
+  @Post(':id/rectificaciones')
+  @RequierePermiso('obligacion:ver')
+  @UseInterceptors(
+    FilesInterceptor('constancia', 1, {
+      limits: { fileSize: TAMANO_MAXIMO_CONSTANCIA_MB * 1024 * 1024, files: 1 },
+    }),
+  )
+  async rectificar(
+    @Param('id', validarId) id: string,
+    @Body(new ValidacionZod(esquemaRectificacionEntrada)) datos: RectificacionEntrada,
+    @UploadedFiles() archivos: Express.Multer.File[] | undefined,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<ObligacionDetalle> {
+    await this.presentacion.rectificar(
       id,
       datos,
       (archivos ?? []).map((archivo) => ({
