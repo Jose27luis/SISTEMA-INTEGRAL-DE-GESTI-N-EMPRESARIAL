@@ -2,6 +2,7 @@
 
 import { cn } from '@sige/ui/cn';
 import {
+  Activity,
   Bell,
   Building2,
   CalendarRange,
@@ -9,8 +10,10 @@ import {
   CircleUserRound,
   ClipboardCheck,
   ClipboardList,
+  Copy,
   FileCheck2,
   Files,
+  FileSpreadsheet,
   FolderOpen,
   History,
   House,
@@ -19,6 +22,7 @@ import {
   ListChecks,
   ListTree,
   type LucideIcon,
+  Repeat,
   ScrollText,
   ShieldCheck,
   Users,
@@ -42,6 +46,10 @@ const ICONOS: Record<IconoNavegacion, LucideIcon> = {
   'tipos-obligacion': ClipboardList,
   documentos: FolderOpen,
   'tipos-documento': Files,
+  recurrentes: Repeat,
+  plantillas: Copy,
+  'reporte-clientes': FileSpreadsheet,
+  procesos: Activity,
   clientes: Building2,
   personal: IdCard,
   usuarios: Users,
