@@ -9,6 +9,9 @@ export type IconoNavegacion =
   | 'historial'
   | 'por-revisar'
   | 'reportes'
+  | 'obligaciones'
+  | 'cronograma'
+  | 'tipos-obligacion'
   | 'clientes'
   | 'personal'
   | 'usuarios'
@@ -44,6 +47,13 @@ export const NAVEGACION: GrupoNavegacion[] = [
     elementos: [
       { ruta: '/tareas', etiqueta: 'Tareas', icono: 'tareas', permiso: 'tarea:ver' },
       { ruta: '/por-revisar', etiqueta: 'Por revisar', icono: 'por-revisar', permiso: 'tarea:revisar' },
+      { ruta: '/obligaciones', etiqueta: 'Obligaciones', icono: 'obligaciones', permiso: 'obligacion:ver' },
+      {
+        ruta: '/configuracion/cronograma',
+        etiqueta: 'Cronograma tributario',
+        icono: 'cronograma',
+        permiso: 'obligacion:ver',
+      },
       { ruta: '/clientes', etiqueta: 'Clientes', icono: 'clientes', permiso: 'cliente:ver' },
       { ruta: '/personal', etiqueta: 'Personal', icono: 'personal', permiso: 'personal:ver' },
       { ruta: '/reportes', etiqueta: 'Reportes', icono: 'reportes', permiso: 'reporte:personal' },
@@ -59,6 +69,12 @@ export const NAVEGACION: GrupoNavegacion[] = [
         etiqueta: 'Catálogos',
         icono: 'catalogos',
         permiso: 'catalogo:gestionar',
+      },
+      {
+        ruta: '/configuracion/obligaciones',
+        etiqueta: 'Tipos de obligación',
+        icono: 'tipos-obligacion',
+        permiso: 'cronograma:gestionar',
       },
       { ruta: '/auditoria', etiqueta: 'Auditoría', icono: 'auditoria', permiso: 'auditoria:ver' },
     ],
