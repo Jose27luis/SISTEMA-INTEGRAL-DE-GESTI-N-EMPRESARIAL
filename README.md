@@ -2755,7 +2755,7 @@ Terminado y publicado el 24/11/2026; detalle y pendientes en [12.11](#1211-sprin
 | Sprint | Alcance | Requerimientos |
 |---|---|---|
 | 5 ✅ | Tipos de obligación, configuración por cliente, carga del cronograma oficial por periodo y último dígito, generación mensual de obligaciones con tarea, control mensual cliente × obligación, calendario tributario. Detalle en [12.12](#1212-sprint-5-obligaciones-tributarias-y-cronograma). | RF-TRI-01 a 08, 11, 12, RF-AUTO-02, RF-GER-05 |
-| 6 | Documentos con tipos, carpetas, versiones, vencimientos, búsqueda, documentación esperada; integración de evidencias y constancias al expediente | RF-DOC-01 a 10, RF-NOT-04 |
+| 6 ✅ | Documentos con tipos, carpetas, versiones, vencimientos, búsqueda, documentación esperada; integración de evidencias y constancias al expediente. Detalle en [12.13](#1213-sprint-6-documentos-y-expediente-documental). | RF-DOC-01 a 10, RF-NOT-04 |
 | 7 | Rectificaciones e historial tributario, plantillas y tareas recurrentes, accesos de plataformas, ficha operativa, incidencias, búsqueda general, reportes de clientes | RF-TRI-09, 10, RF-TAR-12, 13, RF-AUTO-01, 07, RF-ACC-01 a 05, RF-CLI-06, 09, RF-BUS-01 a 03, RF-REP-04 |
 
 **Criterios de aceptación:**
@@ -3498,6 +3498,97 @@ El periodo de los indicadores no puede superar un año, y la fecha final no pued
 | Importar el cronograma desde Excel | La carga es manual por periodo, según D-04; un importador se puede sumar si Gerencia lo pide. |
 | Constancias en el módulo de documentos (RF-DOC, RF-NOT-04) | Sprint 6; hoy la constancia vive como evidencia de la tarea. |
 | Avisos por correo | Fase 5 (SMTP). |
+
+### 12.13 Sprint 6: documentos y expediente documental
+
+**Modelo de datos** (migración `20261127120000_documentos`):
+
+- **`tipos_documento`:** nombre único y si admite fecha de vencimiento. Vienen cargados los tipos de RF-DOC-02: Ficha RUC, Contrato, Poder, Licencia, Declaración, Constancia, Estado financiero, Comprobante, Informe, Acta, Documento laboral, Documento administrativo y Documento comercial. Contrato, Poder y Licencia admiten vencimiento.
+- **`carpetas`:** por cliente, anidables hasta 5 niveles, con nombre único en el mismo nivel (índices únicos parciales).
+- **`documentos`:** título, tipo, cliente (o interno sin cliente), carpeta, área, periodo, fecha del documento, vencimiento, versión vigente y confidencialidad (`NORMAL` o `RESTRINGIDO`).
+  - Nunca se borran: se archivan con fecha, autor y motivo obligatorio (CHECK).
+  - La carpeta exige cliente y el vencimiento no puede ser anterior a la fecha del documento (CHECK).
+- **`versiones_documento`:** número único por documento, archivo, nota, quién la subió y cuándo.
+- **`documentos_esperados`:** documentación que el cliente debe entregar por tipo y periodo, con fecha límite.
+  - Solo uno vigente por cliente, tipo y periodo (índice único parcial).
+  - Se anula con motivo; no se borra.
+- **Auditoría:** nueva acción `ARCHIVAR`.
+- **Notificaciones nuevas:** `DOCUMENTO_POR_VENCER`, `DOCUMENTO_VENCIDO` y `DOCUMENTACION_FALTANTE`.
+- **Permisos nuevos**, según la matriz de la sección 3:
+  - `documento:ver` y `documento:gestionar`: Gerencia, Contabilidad, Asistente contable y Administración.
+  - El catálogo de tipos usa el permiso existente `catalogo:gestionar` (Gerencia).
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `GET /documentos/tipos` | `documento:ver` | Tipos con su cantidad de documentos. |
+| `POST /documentos/tipos`, `PUT /documentos/tipos/:id`, `POST /documentos/tipos/:id/activacion` | `catalogo:gestionar` | Administrar el catálogo. |
+| `GET /documentos?busqueda=&clienteId=&carpetaId=&tipoDocumentoId=&periodo=&desde=&hasta=&vencimiento=&archivados=&pagina=` | `documento:ver` | Búsqueda paginada (25 por página) dentro del alcance; `desde` y `hasta` son fechas de carga. |
+| `POST /documentos` | `documento:gestionar` | Multipart con los datos y el `archivo`, hasta 25 MB. |
+| `GET /documentos/:id` | `documento:ver` y alcance | Detalle con todas sus versiones. |
+| `PUT /documentos/:id` | `documento:gestionar` | Editar la clasificación. |
+| `POST /documentos/:id/versiones` | `documento:gestionar` | Nueva versión; la anterior se conserva. |
+| `POST /documentos/:id/archivo` | Quien lo subió o Gerencia | Archivar con motivo. |
+| `GET /documentos/clientes/:clienteId` | `documento:ver` y cliente asignado | Expediente: carpetas con conteo, documentación esperada y evidencias y constancias de las tareas del cliente. |
+| `POST /documentos/clientes/:clienteId/carpetas`, `PUT …/carpetas/:carpetaId` | `documento:gestionar` | Crear o renombrar carpetas. |
+| `POST /documentos/clientes/:clienteId/esperados`, `POST …/esperados/:id/anulacion` | `documento:gestionar` | Registrar o anular documentación esperada. |
+| `GET /documentos/opciones`, `GET /documentos/indicadores` | `documento:ver` | Listas para formularios; por vencer, vencidos y documentación no recibida. |
+
+**Reglas implementadas**
+
+- **Alcance:**
+  - Gerencia ve todo, incluidos los documentos restringidos.
+  - Con alcance asignado se ven los documentos normales de los clientes asignados y los propios. Los internos (sin cliente) solo los ve quien los subió y Gerencia.
+  - Solo Gerencia puede marcar un documento como restringido.
+  - Un acceso fuera de alcance devuelve 403 y queda como `PERMISO_DENEGADO`.
+- **Archivos (RF-DOC-01 y 07):**
+  - Se acepta PDF, imágenes, Word, Excel y PowerPoint, verificados por su contenido.
+  - La ruta `/archivos/:id` controla el acceso del documento de cada versión, y cada vista o descarga queda en la auditoría como `DESCARGAR`, con el documento y la versión.
+- **Versiones (RF-DOC-04):** una nueva versión aumenta la vigente con control de concurrencia y conserva las anteriores con quién y cuándo las subió.
+- **Vencimiento (RF-DOC-05):** solo en los tipos que lo admiten. Se avisa 30, 15, 7 y 1 día antes, y una vez al vencer.
+  - Avisa a quien subió el documento y a los responsables del equipo del cliente; los restringidos, solo a quien los subió.
+- **Documentación esperada (RF-DOC-08):**
+  - Al subir o editar un documento del mismo cliente, tipo y periodo, el esperado pendiente queda **recibido** solo. Si ya existía el documento al registrarlo, nace recibido.
+  - Se avisa 3 días y 1 día antes del plazo, y una vez cuando vence sin recibirse.
+- **Archivo (RF-DOC-09):** archivar exige motivo y lo hace quien subió el documento o Gerencia. El documento archivado sale de las vistas normales, se consulta con el filtro «Archivados» y no admite cambios ni versiones.
+- **Expediente (RF-DOC-10):** las evidencias de los avances y las constancias de obligaciones del cliente aparecen en su pestaña Documentos, enlazadas a su tarea y respetando la visibilidad de las tareas.
+- **Alertas:** el worker las revisa cada hora (minuto 25) con bloqueo consultivo; la clave de cada aviso evita duplicarlos.
+
+**Pantallas web:**
+
+- **Documentos:** búsqueda por título, cliente, tipo, periodo, rango de carga, vencimiento y archivados, con paginación y descarga directa.
+- **Subir documento:** clasificación completa. El vencimiento solo aparece en los tipos que lo admiten y la confidencialidad solo para Gerencia.
+- **Detalle del documento:** versiones con ver y descargar, subir otra versión, editar los datos y archivar con confirmación.
+- **Expediente del cliente → Documentos:** carpetas, documentos de la carpeta elegida, documentación esperada (pendiente, recibida o no recibida), evidencias y constancias de las tareas, y formularios para subir, crear carpetas y registrar lo esperado.
+- **Tipos de documento** (Administración).
+- **Inicio (RF-GER-05):** documentos por vencer, vencidos y documentación no recibida.
+
+**Verificación realizada:** typecheck, lint, 76 pruebas unitarias (5 nuevas de avisos por fecha) y build. La migración se aplicó sobre las anteriores y el esquema no queda con diferencias. Contra un stack desechable con PostgreSQL real se probaron:
+
+- **Carpetas:** la subcarpeta se creó. Un nombre repetido sin distinguir mayúsculas dio 409 y una carpeta en un cliente no asignado dio 403.
+- **Esperados:** registrar dos veces el mismo dio 409.
+- **Subidas rechazadas:** vencimiento en un tipo que no lo admite, archivo de texto con extensión `.pdf` y restricción hecha por la asistente (400).
+- **Esperado cumplido:** la declaración de 2026-10 quedó **recibida** al subirla, y el estado financiero quedó **no recibido** con su plazo vencido.
+- **Versiones:** la nueva versión dejó la versión 2 vigente y conservó la 1 con su nota.
+- **Alcance:**
+  - La asistente recibió 403 en el documento de un cliente ajeno y en el restringido, y también al descargar el archivo ajeno; su propia descarga devolvió el PDF.
+  - En la búsqueda, la asistente ve 2 documentos y Gerencia 4. El filtro de por vencer encontró la licencia.
+- **Archivo:**
+  - La contadora recibió 403 al archivar un documento de la asistente.
+  - Al archivarlo la asistente, salió de la vista normal y apareció en archivados; una versión posterior dio 409.
+- **Expediente:** mostró la evidencia del avance de una tarea del cliente.
+- **Worker:** avisó la licencia que vence en 7 días y la documentación no recibida al responsable y a la asistente, sin duplicar al volver a correr.
+- **Auditoría:** creaciones, modificación, archivo, descarga y accesos denegados quedaron registrados.
+- **Web:** Inicio, búsqueda, subida, detalle, pestaña del cliente y tipos se renderizaron con datos reales, y la descarga a través de la web entrega el PDF.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| Clasificación por proyecto (RF-DOC-01) | Se agrega con el módulo de proyectos (Fase 4). |
+| Restaurar un documento archivado | No se pidió; queda consultable y su historial se conserva. |
+| Buscar por el contenido de los archivos | Fuera del alcance; la búsqueda es por los datos del documento. |
 
 ---
 
