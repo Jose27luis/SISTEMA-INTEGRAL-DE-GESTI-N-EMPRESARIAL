@@ -1,6 +1,6 @@
 'use client';
 
-import { ETIQUETAS_PRIORIDAD, type OpcionesTarea, PRIORIDADES, type TareaDetalle } from '@sige/types';
+import { ETIQUETAS_PRIORIDAD, type OpcionesTarea, type Plantilla, PRIORIDADES, type TareaDetalle } from '@sige/types';
 import { AreaTexto, Campo, Casilla, Seleccion } from '@sige/ui/components';
 import { type ReactNode, useActionState, useState } from 'react';
 import { MensajeFormulario } from '@/components/form-message';
@@ -13,6 +13,13 @@ interface PropiedadesFormularioTarea {
   tarea: TareaDetalle | null;
   fechaHoy: string;
   clienteInicial: string | null;
+  plantilla?: Plantilla | null;
+}
+
+function sumarDias(fecha: string, dias: number): string {
+  const resultado = new Date(`${fecha}T00:00:00Z`);
+  resultado.setUTCDate(resultado.getUTCDate() + dias);
+  return resultado.toISOString().slice(0, 10);
 }
 
 export function FormularioTarea({
@@ -21,14 +28,30 @@ export function FormularioTarea({
   tarea,
   fechaHoy,
   clienteInicial,
+  plantilla = null,
 }: PropiedadesFormularioTarea): ReactNode {
   const [estado, accionFormulario] = useActionState(accion, ESTADO_INICIAL);
   const [responsableId, setResponsableId] = useState(tarea?.responsable.id ?? '');
   const [colaboradorIds, setColaboradorIds] = useState<string[]>(
     tarea?.colaboradores.map(({ id }) => id) ?? [],
   );
-  const [requiereAprobacion, setRequiereAprobacion] = useState(tarea?.requiereAprobacion ?? false);
-  const [requiereEvidencia, setRequiereEvidencia] = useState(tarea?.requiereEvidencia ?? false);
+  const [requiereAprobacion, setRequiereAprobacion] = useState(
+    tarea?.requiereAprobacion ?? plantilla?.requiereAprobacion ?? false,
+  );
+  const [requiereEvidencia, setRequiereEvidencia] = useState(
+    tarea?.requiereEvidencia ?? plantilla?.requiereEvidencia ?? false,
+  );
+  const base =
+    tarea ??
+    (plantilla === null
+      ? null
+      : {
+          titulo: plantilla.titulo,
+          instrucciones: plantilla.instrucciones,
+          prioridad: plantilla.prioridad,
+          fechaLimite: sumarDias(fechaHoy, plantilla.diasPlazo),
+          evidenciaRequerida: plantilla.evidenciaRequerida,
+        });
   const valor = (campo: string, actual: string | null | undefined): string | undefined =>
     estado.valores[campo] ?? actual ?? undefined;
   const otrosUsuarios = opciones.usuarios.filter(({ id }) => id !== responsableId);
@@ -41,6 +64,7 @@ export function FormularioTarea({
     <form action={accionFormulario} className="flex flex-col gap-6">
       <MensajeFormulario estado={estado} />
       {tarea === null ? null : <input type="hidden" name="version" value={tarea.version} />}
+      {tarea === null && plantilla !== null ? <input type="hidden" name="plantillaId" value={plantilla.id} /> : null}
 
       <fieldset className="grid gap-4">
         <legend className="mb-2 text-base font-semibold text-marino">Qué hay que hacer</legend>
@@ -51,7 +75,7 @@ export function FormularioTarea({
           required
           minLength={3}
           maxLength={200}
-          defaultValue={valor('titulo', tarea?.titulo)}
+          defaultValue={valor('titulo', base?.titulo)}
           error={estado.errores.titulo}
         />
         <AreaTexto
@@ -61,9 +85,20 @@ export function FormularioTarea({
           ayuda="Detalle el alcance, los documentos involucrados y el criterio de terminado."
           rows={5}
           maxLength={5000}
-          defaultValue={valor('instrucciones', tarea?.instrucciones)}
+          defaultValue={valor('instrucciones', base?.instrucciones)}
           error={estado.errores.instrucciones}
         />
+        {tarea === null ? (
+          <AreaTexto
+            id="items"
+            name="items"
+            etiqueta="Lista de verificación (opcional)"
+            ayuda="Un paso por línea; el responsable los irá marcando."
+            rows={4}
+            defaultValue={valor('items', plantilla?.items.join('\n'))}
+            error={estado.errores.items}
+          />
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-3">
           <Seleccion
             id="clienteId"
@@ -84,7 +119,7 @@ export function FormularioTarea({
             id="prioridad"
             name="prioridad"
             etiqueta="Prioridad"
-            defaultValue={valor('prioridad', tarea?.prioridad) ?? 'MEDIA'}
+            defaultValue={valor('prioridad', base?.prioridad) ?? 'MEDIA'}
             error={estado.errores.prioridad}
           >
             {PRIORIDADES.map((prioridad) => (
@@ -108,7 +143,7 @@ export function FormularioTarea({
               type="date"
               etiqueta="Fecha límite"
               required
-              defaultValue={valor('fechaLimite', tarea?.fechaLimite)}
+              defaultValue={valor('fechaLimite', base?.fechaLimite)}
               error={estado.errores.fechaLimite}
             />
           </div>
@@ -217,7 +252,7 @@ export function FormularioTarea({
             required
             rows={2}
             maxLength={1000}
-            defaultValue={valor('evidenciaRequerida', tarea?.evidenciaRequerida)}
+            defaultValue={valor('evidenciaRequerida', base?.evidenciaRequerida)}
             error={estado.errores.evidenciaRequerida}
           />
         ) : null}
