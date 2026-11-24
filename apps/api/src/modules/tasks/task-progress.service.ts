@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import {
   type AvanceEntrada,
   type ComentarioEntrada,
@@ -19,6 +20,8 @@ export interface ArchivoRecibido {
   nombre: string;
   contenido: Buffer;
 }
+
+export type PasoAdicionalAvance = (tx: Prisma.TransactionClient, archivoIds: readonly string[]) => Promise<void>;
 
 interface EvidenciaPreparada {
   nombre: string;
@@ -43,6 +46,7 @@ export class AvancesTareaService {
     archivos: readonly ArchivoRecibido[],
     usuario: UsuarioAutenticado,
     contexto: ContextoCliente,
+    enLaMismaTransaccion?: PasoAdicionalAvance,
   ): Promise<void> {
     const participacion = await this.acceso.obtenerVisible(usuario, tareaId, contexto);
 
@@ -92,6 +96,7 @@ export class AvancesTareaService {
 
     const notificados = await this.prisma.$transaction(async (tx) => {
       const avance = await tx.avance.create({ data: { ...entrada, tareaId, autorId: usuario.usuarioId } });
+      const archivoIds: string[] = [];
 
       for (const { evidencia, guardado } of guardados) {
         const archivo = await tx.archivo.create({
@@ -107,6 +112,11 @@ export class AvancesTareaService {
         });
 
         await tx.evidencia.create({ data: { avanceId: avance.id, archivoId: archivo.id } });
+        archivoIds.push(archivo.id);
+      }
+
+      if (enLaMismaTransaccion !== undefined) {
+        await enLaMismaTransaccion(tx, archivoIds);
       }
 
       await tx.tarea.update({
