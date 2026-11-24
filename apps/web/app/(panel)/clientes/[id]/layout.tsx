@@ -64,6 +64,7 @@ export default async function LayoutCliente({ children, params }: PropiedadesLay
         clienteId={cliente.id}
         totalContactos={cliente.contactos.length}
         totalEquipo={cliente.asignaciones.length}
+        verObligaciones={tienePermiso(perfil, 'obligacion:ver')}
       />
       {children}
     </>
