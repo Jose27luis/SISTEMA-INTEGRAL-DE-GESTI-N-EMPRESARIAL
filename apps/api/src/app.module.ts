@@ -10,6 +10,7 @@ import { CatalogosModule } from './modules/catalogs/catalogs.module';
 import { OperacionClienteModule } from './modules/client-operations/client-operations.module';
 import { ClientesModule } from './modules/clients/clients.module';
 import { DocumentosModule } from './modules/documents/documents.module';
+import { FinanzasModule } from './modules/finance/finance.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotificacionesModule } from './modules/notifications/notifications.module';
 import { ObligacionesModule } from './modules/obligations/obligations.module';
@@ -41,6 +42,7 @@ import { UsuariosModule } from './modules/users/users.module';
     AccesosPlataformaModule,
     OperacionClienteModule,
     BusquedaModule,
+    FinanzasModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GuardiaSesion },
