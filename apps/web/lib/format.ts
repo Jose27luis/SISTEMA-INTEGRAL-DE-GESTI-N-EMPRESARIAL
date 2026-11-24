@@ -77,3 +77,21 @@ export function formatearTamano(bytes: number): string {
 
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+const FORMATO_MONEDA = new Intl.NumberFormat('es-PE', {
+  style: 'currency',
+  currency: 'PEN',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+export function formatearMoneda(monto: number): string {
+  return FORMATO_MONEDA.format(monto);
+}
+
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'dic'];
+
+export function formatearPeriodo(periodo: string): string {
+  const [anio, mes] = periodo.split('-');
+  return `${MESES[Number(mes) - 1] ?? mes ?? ''} ${anio ?? ''}`;
+}
