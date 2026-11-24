@@ -1,0 +1,16 @@
+import { Module } from '@nestjs/common';
+import { PrismaModule } from '../../prisma/prisma.module';
+import { AuditoriaModule } from '../audit/audit.module';
+import { TareasModule } from '../tasks/tasks.module';
+import { TableroService } from './dashboard.service';
+import { DatosReportesService } from './report-data.service';
+import { ReportesController } from './reports.controller';
+import { ReportesService } from './reports.service';
+import { HistorialTrabajadorService } from './staff-history.service';
+
+@Module({
+  imports: [PrismaModule, AuditoriaModule, TareasModule],
+  controllers: [ReportesController],
+  providers: [DatosReportesService, TableroService, HistorialTrabajadorService, ReportesService],
+})
+export class ReportesModule {}
