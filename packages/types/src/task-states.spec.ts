@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ESTADOS_TAREA, estaAtrasada, estadoTrasAccion } from './task-states';
+import {
+  accionAlRegistrarAvance,
+  accionDeEnvio,
+  ESTADOS_TAREA,
+  estaAtrasada,
+  estadoTrasAccion,
+} from './task-states';
 
 describe('estadoTrasAccion', () => {
   it('recorre el ciclo completo con aprobación y una observación', () => {
@@ -66,5 +72,30 @@ describe('estaAtrasada', () => {
     expect(estaAtrasada('PENDIENTE', '2026-11-23', '2026-11-23')).toBe(false);
     expect(estaAtrasada('FINALIZADA', '2026-11-01', '2026-11-23')).toBe(false);
     expect(estaAtrasada('CANCELADA', '2026-11-01', '2026-11-23')).toBe(false);
+  });
+});
+
+describe('accionAlRegistrarAvance', () => {
+  it('inicia una tarea pendiente y marca como corregida una observada', () => {
+    expect(accionAlRegistrarAvance('PENDIENTE')).toBe('INICIAR');
+    expect(accionAlRegistrarAvance('OBSERVADA')).toBe('CORREGIR');
+  });
+
+  it('no cambia el estado en los demás casos', () => {
+    expect(accionAlRegistrarAvance('EN_PROCESO')).toBeNull();
+    expect(accionAlRegistrarAvance('CORREGIDA')).toBeNull();
+  });
+});
+
+describe('accionDeEnvio', () => {
+  it('termina una tarea en proceso y reenvía una corregida', () => {
+    expect(accionDeEnvio('EN_PROCESO')).toBe('TERMINAR');
+    expect(accionDeEnvio('CORREGIDA')).toBe('REENVIAR');
+  });
+
+  it('no permite enviar desde otros estados', () => {
+    expect(accionDeEnvio('PENDIENTE')).toBeNull();
+    expect(accionDeEnvio('OBSERVADA')).toBeNull();
+    expect(accionDeEnvio('EN_REVISION')).toBeNull();
   });
 });
