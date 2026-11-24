@@ -3,6 +3,7 @@
 import { cn } from '@sige/ui/cn';
 import {
   Activity,
+  BadgeDollarSign,
   Bell,
   Building2,
   CalendarRange,
@@ -22,9 +23,12 @@ import {
   ListChecks,
   ListTree,
   type LucideIcon,
+  ReceiptText,
   Repeat,
   ScrollText,
   ShieldCheck,
+  Tags,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -50,6 +54,10 @@ const ICONOS: Record<IconoNavegacion, LucideIcon> = {
   plantillas: Copy,
   'reporte-clientes': FileSpreadsheet,
   procesos: Activity,
+  ingresos: BadgeDollarSign,
+  egresos: ReceiptText,
+  'reportes-financieros': TrendingUp,
+  'catalogos-financieros': Tags,
   clientes: Building2,
   personal: IdCard,
   usuarios: Users,
