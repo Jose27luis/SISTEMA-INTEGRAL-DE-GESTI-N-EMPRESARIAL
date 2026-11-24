@@ -2,8 +2,12 @@
 
 import {
   esquemaAvanceEntrada,
+  esquemaCancelacionEntrada,
   esquemaComentarioEntrada,
   esquemaEdicionTarea,
+  esquemaEnvioEntrada,
+  esquemaFinalizacionEntrada,
+  esquemaRevisionEntrada,
   esquemaTareaDetalle,
   esquemaTareaEntrada,
   MAXIMO_EVIDENCIAS_POR_AVANCE,
@@ -220,4 +224,134 @@ export async function comentarTarea(
 
   revalidatePath(`/tareas/${id}`);
   return estadoExitoso('Comentario publicado.');
+}
+
+async function ejecutarTransicion(
+  id: string,
+  ruta: string,
+  cuerpo: unknown,
+  valores: Partial<Record<string, string>>,
+  mensaje: string,
+): Promise<EstadoFormulario> {
+  const resultado = await solicitarApi(`/tareas/${id}/${ruta}`, {
+    metodo: 'POST',
+    cuerpo,
+    esquema: esquemaTareaDetalle,
+  });
+
+  if (!resultado.ok) {
+    return estadoConError(resultado.error, valores);
+  }
+
+  revalidatePath('/tareas', 'layout');
+  revalidatePath('/mi-trabajo');
+  revalidatePath('/por-revisar');
+  return estadoExitoso(mensaje);
+}
+
+export async function enviarTarea(
+  id: string,
+  _anterior: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success) {
+    return ERROR_TAREA;
+  }
+
+  const valores = valoresDeFormulario(datos);
+  const entrada = esquemaEnvioEntrada.safeParse({ comentario: leerTexto(datos, 'comentario') });
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  return ejecutarTransicion(id, 'envio', entrada.data, valores, 'Trabajo enviado.');
+}
+
+export async function revisarTarea(
+  id: string,
+  _anterior: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success) {
+    return ERROR_TAREA;
+  }
+
+  const valores = valoresDeFormulario(datos);
+  const entrada = esquemaRevisionEntrada.safeParse({
+    decision: leerTexto(datos, 'decision'),
+    comentario: leerTexto(datos, 'comentario'),
+  });
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  return ejecutarTransicion(
+    id,
+    'revision',
+    entrada.data,
+    valores,
+    entrada.data.decision === 'APROBADA' ? 'Trabajo aprobado.' : 'Trabajo observado: se devolvió al responsable.',
+  );
+}
+
+export async function finalizarTarea(
+  id: string,
+  _anterior: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success) {
+    return ERROR_TAREA;
+  }
+
+  const valores = valoresDeFormulario(datos);
+
+  if (leerTexto(datos, 'confirmacion') !== 'si') {
+    return estadoConError(
+      {
+        mensaje: 'Confirme la acción para continuar.',
+        errores: [{ campo: 'confirmacion', mensaje: 'Marque la casilla de confirmación.' }],
+      },
+      valores,
+    );
+  }
+
+  const entrada = esquemaFinalizacionEntrada.safeParse({ comentario: '' });
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  return ejecutarTransicion(id, 'finalizacion', entrada.data, valores, 'Tarea finalizada.');
+}
+
+export async function cancelarTarea(
+  id: string,
+  _anterior: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success) {
+    return ERROR_TAREA;
+  }
+
+  const valores = valoresDeFormulario(datos);
+
+  if (leerTexto(datos, 'confirmacion') !== 'si') {
+    return estadoConError(
+      {
+        mensaje: 'Confirme la acción para continuar.',
+        errores: [{ campo: 'confirmacion', mensaje: 'Marque la casilla de confirmación.' }],
+      },
+      valores,
+    );
+  }
+
+  const entrada = esquemaCancelacionEntrada.safeParse({ motivo: leerTexto(datos, 'motivo') });
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  return ejecutarTransicion(id, 'cancelacion', entrada.data, valores, 'Tarea cancelada.');
 }
