@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { GuardiaSesion } from './modules/auth/session.guard';
 import { CatalogosModule } from './modules/catalogs/catalogs.module';
 import { ClientesModule } from './modules/clients/clients.module';
+import { DocumentosModule } from './modules/documents/documents.module';
 import { HealthModule } from './modules/health/health.module';
 import { NotificacionesModule } from './modules/notifications/notifications.module';
 import { ObligacionesModule } from './modules/obligations/obligations.module';
@@ -31,6 +32,7 @@ import { UsuariosModule } from './modules/users/users.module';
     NotificacionesModule,
     ReportesModule,
     ObligacionesModule,
+    DocumentosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GuardiaSesion },
