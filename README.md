@@ -2771,14 +2771,14 @@ Terminado y publicado el 24/11/2026; detalle y pendientes en [12.11](#1211-sprin
 
 | Sprint | Alcance | Requerimientos |
 |---|---|---|
-| 8 | Ficha comercial del cliente y servicios contratados, ingresos, cobros parciales, egresos, anulaciones con motivo, generación de honorarios mensuales | RF-CLI-05, RF-FIN-01 a 05, RF-ROL-07 |
-| 9 | Cuentas por cobrar por antigüedad, morosos, rentabilidad por servicio y cliente, flujo de caja, recordatorios de pago, indicadores financieros del tablero | RF-FIN-06 a 09, RF-AUTO-05, RF-NOT-05, RF-GER-06, RF-REP-05 |
+| 8 ✅ | Ficha comercial del cliente y servicios contratados, ingresos, cobros parciales, egresos, anulaciones con motivo, generación de honorarios mensuales. Detalle en [12.15](#1215-sprints-8-y-9-gestión-administrativa-y-financiera). La doble aprobación (RF-ROL-07, prioridad C) queda diferida. | RF-CLI-05, RF-FIN-01 a 05, RF-ROL-07 |
+| 9 ✅ | Cuentas por cobrar por antigüedad, morosos, rentabilidad por servicio y cliente, flujo de caja, recordatorios de pago, indicadores financieros del tablero. Detalle en [12.15](#1215-sprints-8-y-9-gestión-administrativa-y-financiera). | RF-FIN-06 a 09, RF-AUTO-05, RF-NOT-05, RF-GER-06, RF-REP-05 |
 
 **Criterios de aceptación:**
 
-- [ ] El saldo y el estado de cobranza se recalculan con cada cobro y coinciden con la suma de cobros.
-- [ ] Un ingreso anulado no suma en ningún reporte y conserva su historial.
-- [ ] El flujo de caja de un mes cuadra con la suma de cobros y egresos del mes.
+- [x] El saldo y el estado de cobranza se recalculan con cada cobro y coinciden con la suma de cobros.
+- [x] Un ingreso anulado no suma en ningún reporte y conserva su historial.
+- [x] El flujo de caja de un mes cuadra con la suma de cobros y egresos del mes.
 
 ### 10.7 Fase 4: proyectos y gestión comercial
 
@@ -3719,6 +3719,122 @@ El periodo de los indicadores no puede superar un año, y la fecha final no pued
 | Buscar proyectos (RF-BUS-01) | Con el módulo de proyectos (Fase 4). |
 | Integración directa con la API de la bóveda | No se pidió; el registro guarda la referencia de la entrada (D-02). |
 | Editar o reordenar los pasos de una lista ya creada | Se pueden agregar y marcar; no se borran, para conservar el historial. |
+
+### 12.15 Sprints 8 y 9: gestión administrativa y financiera
+
+**Modelo de datos** (migración `20261129120000_finanzas`):
+
+- **`servicios`:** catálogo de lo que ofrece el estudio, con nombre único sin distinguir mayúsculas y tipo (recurrente o por proyecto).
+- **`servicios_contratados`:** cliente, servicio, honorario (CHECK mayor a cero), periodicidad (mensual, anual o pago único) y vigencia (CHECK de orden). Se dan de baja con motivo; no se borran.
+- **`contratos_cliente`:** uno por cliente, con inicio, vencimiento, día de pago (CHECK de 1 a 28), condiciones, observaciones y el documento firmado del expediente.
+- **`ingresos`:**
+  - Contenido: cliente, servicio contratado opcional, concepto, periodo, comprobante (tipo y serie-número), emisión, vencimiento, monto, pagado, saldo, origen automático, quién lo creó y la anulación con motivo.
+  - Restricciones:
+    - Un CHECK exige `saldo = monto − pagado` y `0 ≤ pagado ≤ monto`, así que la base nunca guarda un saldo inconsistente.
+    - Otros CHECK piden el vencimiento posterior a la emisión, el formato del periodo, el motivo en las anulaciones y el tipo si hay número de comprobante.
+    - Un índice único parcial impide dos honorarios automáticos del mismo servicio y periodo.
+- **`cobros`:** ingreso, fecha, importe (CHECK mayor a cero), medio de pago, número de operación, voucher opcional, quién lo registró y la anulación con motivo.
+- **`egresos`:**
+  - Contenido: concepto, proveedor opcional, fecha, importe, categoría, comprobante (tipo, serie-número y archivo escaneado), responsable, medio de pago, cliente opcional para la rentabilidad, observaciones y la anulación con motivo.
+  - Restricciones: los mismos CHECK que los ingresos.
+- **`proveedores`:** razón social, RUC o DNI único y validado, y contacto.
+- **Catálogos sembrados:**
+  - **`medios_pago`:** Efectivo, Transferencia bancaria, Depósito en cuenta, Yape, Plin, Tarjeta y Cheque.
+  - **`categorias_egreso`:** Planilla y honorarios, Alquiler, Servicios básicos, Software y suscripciones, Útiles y suministros, Impuestos y tributos, Movilidad y Otros.
+- **Auditoría:** nueva acción `ANULAR`. La lista de acciones de los tipos compartidos se completó con `CAMBIAR_ESTADO`, `DESCARGAR`, `ARCHIVAR` y `CONSULTAR`. Faltaban desde los Sprints 6 y 7, y con ellas la pantalla de Auditoría habría fallado al mostrar esos registros.
+- **Notificación nueva:** `PAGO_VENCIDO`.
+- **Permisos nuevos:**
+  - `comercial:ver`: Gerencia, Administración y Comercial.
+  - `comercial:gestionar`, `finanza:ingresos`, `finanza:egresos` y `finanza:catalogos`: Gerencia y Administración.
+  - `finanza:anular`: Gerencia.
+
+**Alcance:** como indica la matriz de la sección 3 («T» para Administración y «L» para Comercial en ficha comercial e ingresos), en finanzas el alcance lo da el permiso y no la asignación al cliente. Quien tiene `comercial:ver` ve la información financiera de todos los clientes. La pestaña Comercial vive dentro del expediente, así que se abre solo en los clientes que el usuario ya puede ver. Desde Ingresos y cobranza se llega a todos.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `GET /finanzas/opciones` | `comercial:ver` | Clientes, servicios, medios de pago, categorías, proveedores y, con `finanza:egresos`, responsables. |
+| `GET /finanzas/indicadores` | `finanza:ingresos` | Facturado y cobrado del mes, saldo por cobrar, vencido y clientes con atraso. |
+| `GET/POST /finanzas/catalogos/:catalogo`, `PUT …/:id`, `POST …/:id/activacion` | `finanza:catalogos` | Servicios, medios de pago y categorías de egreso. |
+| `GET/POST /finanzas/proveedores`, `PUT …/:id`, `POST …/:id/activacion` | `finanza:egresos` | Proveedores. |
+| `GET /clientes/:clienteId/ficha-comercial` | `comercial:ver` | Contrato, servicios, honorario mensual vigente, totales y los últimos 24 ingresos. |
+| `PUT /clientes/:clienteId/contrato` | `comercial:gestionar` | Crear o actualizar el contrato. |
+| `POST /clientes/:clienteId/servicios`, `PUT …/:servicioId`, `POST …/:servicioId/baja` | `comercial:gestionar` | Servicios contratados; la baja exige motivo. |
+| `GET /finanzas/ingresos` | `comercial:ver` | Filtros por cliente, estado, periodo, vencidos y texto; totales sin anulados. |
+| `POST /finanzas/ingresos`, `POST /finanzas/ingresos/generacion` | `finanza:ingresos` | Ingreso manual y generación de honorarios de un mes. |
+| `GET /finanzas/ingresos/:id` | `comercial:ver` | Detalle con cobros y vouchers. |
+| `PUT /finanzas/ingresos/:id/comprobante` | `finanza:ingresos` | Anotar el comprobante emitido en el sistema de facturación (D-07). |
+| `POST /finanzas/ingresos/:id/cobros` | `finanza:ingresos` | Multipart con fecha, importe, medio, operación y voucher opcional. |
+| `POST /finanzas/ingresos/:id/anulacion`, `POST …/cobros/:cobroId/anulacion` | `finanza:anular` | Anulación con motivo. |
+| `GET/POST /finanzas/egresos`, `POST …/:id/anulacion` | `finanza:egresos`; anular con `finanza:anular` | Egresos con comprobante escaneado opcional. |
+| `GET /reportes/cuentas-por-cobrar`, `GET /reportes/honorarios` | `finanza:ingresos` | Antigüedad del saldo y honorarios y pagos por cliente; Excel y PDF con `formato`. |
+| `GET /reportes/flujo-caja`, `GET /reportes/rentabilidad` | `finanza:egresos` | Flujo de caja mensual y rentabilidad; Excel y PDF con `formato`. |
+
+**Reglas implementadas**
+
+- **Montos:** se validan con dos decimales como máximo y se suman en céntimos, sin errores de redondeo.
+- **Cobros (RF-FIN-02):**
+  - Cada cobro bloquea la fila del ingreso (`SELECT … FOR UPDATE`) antes de recalcular. Dos cobros simultáneos nunca superan el saldo.
+  - El importe no puede exceder el saldo, y la fecha no puede ser futura.
+  - El estado se deriva del pagado: Pendiente, Pago parcial o Pagado.
+  - El voucher es un PDF o una imagen, verificados por su contenido, de hasta 10 MB.
+- **Anulaciones (RF-FIN-05):**
+  - Nada se borra.
+  - Un ingreso con cobros vigentes no se anula: primero se anula cada cobro, y su importe vuelve al saldo.
+  - Lo anulado deja de contar en totales, reportes e indicadores, pero se sigue viendo tachado, con su motivo y en la auditoría.
+- **Honorarios mensuales (RF-FIN-03):**
+  - Por cada servicio mensual activo y vigente en el mes, de un cliente activo, se crea un ingreso. Concepto: «Servicio · mes año». Emisión: el día 1. Vencimiento: el día de pago del contrato, o el 28 si no hay contrato.
+  - El worker lo hace cada día a las 06:10 y al arrancar, para el mes en curso. Gerencia o Administración pueden generar cualquier mes desde la web.
+  - No duplica, y no vuelve a crear un honorario que alguien anuló.
+- **Archivos financieros:**
+  - Los vouchers los descarga quien tiene `comercial:ver`, y los comprobantes de egreso quien tiene `finanza:egresos`.
+  - Las asignaciones al cliente ya no bastan para estos archivos. Cada intento denegado queda en la auditoría.
+- **Cuentas por cobrar (RF-FIN-06):** tramos por días desde el vencimiento: por vencer, 1 a 30, 31 a 60, 61 a 90 y más de 90. La lista se ordena por el mayor atraso.
+- **Rentabilidad (RF-FIN-07):**
+  - Por cliente: facturado, cobrado, egresos asignados al cliente, margen (facturado − egresos) y horas de los avances registrados en sus tareas.
+  - Por servicio: lo cobrado, las horas y los egresos de cada cliente se reparten entre sus servicios en proporción a lo facturado por cada uno.
+- **Flujo de caja (RF-FIN-08):** por mes, los cobros recibidos frente a los egresos pagados, con el neto, el acumulado y el desglose por categoría. El rango por defecto son los últimos 12 meses, con un máximo de 24.
+- **Recordatorio de pago vencido (RF-FIN-09, RF-AUTO-05, RF-NOT-05):**
+  - Corre cada día a las 08:15 y al arrancar.
+  - Avisa a los usuarios con `finanza:ingresos` a 1, 7, 15 y 30 días del vencimiento, y luego cada 30 días, una vez por hito.
+- **Indicadores (RF-GER-06):** el inicio de Gerencia y Administración muestra el facturado y el cobrado del mes, el saldo por cobrar y lo vencido, con la cantidad de clientes con atraso.
+
+**Pantallas web:**
+
+- **Finanzas:**
+  - **Ingresos y cobranza:** filtros, totales y generación de honorarios. El detalle permite registrar cobros con voucher, anotar el comprobante y anular.
+  - **Registrar ingreso.**
+  - **Egresos:** filtros, registro con comprobante escaneado y anulación.
+  - **Reportes financieros:** cuentas por cobrar, honorarios y pagos, flujo de caja y rentabilidad, con Excel y PDF.
+- **Expediente del cliente:** nueva pestaña **Comercial**, con indicadores, servicios contratados (agregar, editar o dar de baja), historial de pagos y contrato.
+- **Administración:** **Catálogos financieros**, con servicios, medios de pago, categorías de egreso y proveedores.
+- **Inicio:** indicadores financieros.
+
+**Verificación realizada:** typecheck, lint, pruebas unitarias (7 nuevas de reglas financieras) y build. La migración se aplicó sobre las anteriores sin diferencias de esquema. Contra un stack desechable con PostgreSQL real se probaron:
+
+- **Permisos:**
+  - Comercial recibió 403 al contratar servicios, cobrar, generar honorarios, ver egresos y ver reportes.
+  - La asistente recibió 403 en la ficha comercial y en el voucher.
+  - Administración recibió 403 al anular.
+- **Validaciones:** nombre repetido sin distinguir mayúsculas (409), vencimiento del contrato anterior al inicio (400), honorario con tres decimales (400), RUC inválido o repetido (400 y 409), y egreso con fecha futura o con serie sin tipo (400).
+- **Honorarios:** el primer mes generó 3 y la segunda corrida ninguno; octubre generó 1. Los vencimientos cayeron el día 10 del contrato o el 28 sin contrato.
+- **Cobros:**
+  - Se rechazaron la fecha futura y el exceso sobre el saldo.
+  - El cobro parcial con voucher dejó el ingreso en Pago parcial.
+  - De dos cobros simultáneos de 500 sobre un saldo de 900, uno pasó y el otro dio 400.
+  - Anular el ingreso con cobros dio 409. Anular el cobro repuso el saldo, y repetir la anulación dio 409. Con el cobro final quedó Pagado.
+- **Recordatorio:** un ingreso vencido hace 7 días avisó a Gerencia y a Administración.
+- **Reportes:** los totales de cuentas por cobrar, flujo, rentabilidad, honorarios e indicadores cuadraron a mano y excluyeron lo anulado. Los 8 archivos Excel y PDF se descargaron, también a través de la web.
+- **Web:** las 14 pantallas nuevas o modificadas se renderizaron con datos reales; el menú y el inicio cambian según el rol.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| Doble aprobación de operaciones sensibles (RF-ROL-07, prioridad C) | Diferida: hoy las anulaciones están reservadas a Gerencia y siempre exigen motivo. |
+| Emitir comprobantes electrónicos | Fuera de alcance por D-07: se registra el comprobante emitido en el sistema de facturación actual. |
+| Egresos asignados a proyectos | Con el módulo de proyectos (Fase 4). |
 
 ---
 
