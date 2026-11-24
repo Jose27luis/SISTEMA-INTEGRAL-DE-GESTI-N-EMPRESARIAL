@@ -1,20 +1,30 @@
 import { ETIQUETAS_ESTADO_TAREA, esquemaTareaDetalle } from '@sige/types';
-import { Alerta, Tarjeta } from '@sige/ui/components';
+import { Alerta, Insignia, Tarjeta } from '@sige/ui/components';
 import { Download, Eye, FileText } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { z } from 'zod';
+import { FormularioConfirmacion } from '@/components/confirm-action-form';
 import { SinAcceso } from '@/components/no-access';
 import { EncabezadoPagina } from '@/components/page-header';
 import { BarraAvance, EstadoTareaInsignia, PrioridadInsignia } from '@/components/task-badges';
 import { solicitarApi } from '@/lib/api';
 import { formatearFecha, formatearFechaHora, formatearMinutos, formatearTamano } from '@/lib/format';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
-import { comentarTarea, iniciarTarea, registrarAvance } from '../actions';
+import {
+  cancelarTarea,
+  comentarTarea,
+  enviarTarea,
+  finalizarTarea,
+  iniciarTarea,
+  registrarAvance,
+  revisarTarea,
+} from '../actions';
 import { FormularioComentario } from './comment-form';
 import { FormularioAvance } from './progress-form';
+import { FormularioEnvio, FormularioRevision } from './review-forms';
 import { BotonIniciar } from './start-button';
 
 export const metadata: Metadata = { title: 'Tarea · TORRES ASOCIADOS' };
@@ -98,6 +108,57 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
               </p>
             ) : null}
           </Tarjeta>
+
+          {tarea.estado === 'CANCELADA' && tarea.motivoCancelacion !== null ? (
+            <Alerta tono="aviso" titulo="Tarea cancelada">
+              {tarea.motivoCancelacion}
+            </Alerta>
+          ) : null}
+
+          {tarea.estado === 'OBSERVADA' && tarea.rondas[0]?.decision === 'OBSERVADA' ? (
+            <Alerta tono="error" titulo={`Observación de ${tarea.rondas[0].revisor.nombre}`}>
+              {tarea.rondas[0].comentario}
+              {tarea.acciones.registrarAvance
+                ? ' Registre un avance con la corrección y luego reenvíela a revisión.'
+                : ''}
+            </Alerta>
+          ) : null}
+
+          {tarea.acciones.revisar ? (
+            <Tarjeta
+              titulo="Revisar trabajo"
+              descripcion={`Ronda ${String(tarea.rondas.length + 1)}. Revise los avances y evidencias antes de decidir.`}
+            >
+              <FormularioRevision accion={revisarTarea.bind(null, tarea.id)} />
+            </Tarjeta>
+          ) : null}
+
+          {tarea.acciones.enviar ? (
+            <Tarjeta titulo={tarea.estado === 'CORREGIDA' ? 'Reenviar a revisión' : 'Terminar tarea'}>
+              <FormularioEnvio
+                accion={enviarTarea.bind(null, tarea.id)}
+                requiereAprobacion={tarea.requiereAprobacion}
+                esCorreccion={tarea.estado === 'CORREGIDA'}
+                faltaEvidencia={
+                  tarea.requiereEvidencia && tarea.evidenciasAdjuntas === 0
+                    ? (tarea.evidenciaRequerida ?? 'archivos de respaldo')
+                    : null
+                }
+              />
+            </Tarjeta>
+          ) : null}
+
+          {tarea.acciones.finalizar ? (
+            <Tarjeta titulo="Finalizar tarea" descripcion="El trabajo ya fue aprobado.">
+              <FormularioConfirmacion
+                accion={finalizarTarea.bind(null, tarea.id)}
+                etiquetaBoton="Finalizar"
+                textoPendiente="Finalizando…"
+                variante="primario"
+                consecuencia="La tarea queda cerrada como Finalizada."
+              />
+            </Tarjeta>
+          ) : null}
 
           {tarea.acciones.registrarAvance ? (
             <Tarjeta titulo="Registrar avance" descripcion="Cada avance queda registrado con su fecha y no se edita.">
@@ -257,6 +318,29 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
             </dl>
           </Tarjeta>
 
+          {tarea.rondas.length === 0 ? null : (
+            <Tarjeta titulo="Rondas de revisión">
+              <ol className="flex flex-col gap-3 text-sm">
+                {tarea.rondas.map((ronda) => (
+                  <li key={ronda.id} className="flex flex-col gap-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-tinta">Ronda {ronda.numero}</span>
+                      <Insignia tono={ronda.decision === 'APROBADA' ? 'exito' : 'peligro'}>
+                        {ronda.decision === 'APROBADA' ? 'Aprobada' : 'Observada'}
+                      </Insignia>
+                    </span>
+                    <span className="text-xs text-apagado">
+                      {ronda.revisor.nombre} · {formatearFechaHora(ronda.fecha)}
+                    </span>
+                    {ronda.comentario === null ? null : (
+                      <span className="whitespace-pre-line text-tinta">{ronda.comentario}</span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </Tarjeta>
+          )}
+
           <Tarjeta titulo="Historial de estados">
             <ol className="flex flex-col gap-3 text-sm">
               {tarea.transiciones.map((transicion) => (
@@ -274,6 +358,20 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
               ))}
             </ol>
           </Tarjeta>
+
+          {tarea.acciones.cancelar ? (
+            <Tarjeta titulo="Cancelar tarea" descripcion="Para trabajos que ya no deben hacerse.">
+              <FormularioConfirmacion
+                accion={cancelarTarea.bind(null, tarea.id)}
+                etiquetaBoton="Cancelar tarea"
+                textoPendiente="Cancelando…"
+                variante="peligro"
+                pedirMotivo
+                ayudaMotivo="Justificación obligatoria; la verán los participantes."
+                consecuencia="La tarea se cierra como Cancelada y no admite más avances. Su historial se conserva."
+              />
+            </Tarjeta>
+          ) : null}
         </div>
       </div>
     </>
