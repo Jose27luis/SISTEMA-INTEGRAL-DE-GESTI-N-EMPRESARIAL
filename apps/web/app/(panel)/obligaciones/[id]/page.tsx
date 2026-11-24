@@ -12,8 +12,9 @@ import { EstadoTareaInsignia } from '@/components/task-badges';
 import { solicitarApi } from '@/lib/api';
 import { fechaHoyEnLima, formatearFecha, formatearFechaHora, formatearTamano } from '@/lib/format';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
-import { presentarObligacion } from '../actions';
+import { presentarObligacion, rectificarObligacion } from '../actions';
 import { FormularioPresentacion } from './filing-form';
+import { FormularioRectificacion } from './rectification-form';
 
 export const metadata: Metadata = { title: 'Obligación · TORRES ASOCIADOS' };
 
@@ -125,6 +126,46 @@ export default async function PaginaObligacion({ params }: PropiedadesPaginaObli
               </dl>
             )}
           </Tarjeta>
+          {obligacion.rectificaciones.length > 0 || obligacion.puedeRectificar ? (
+            <Tarjeta
+              titulo={`Rectificaciones (${String(obligacion.rectificaciones.length)})`}
+              descripcion="Declaraciones rectificatorias vinculadas a esta obligación."
+            >
+              <div className="flex flex-col gap-4">
+                {obligacion.rectificaciones.length === 0 ? null : (
+                  <ul className="flex flex-col divide-y divide-borde">
+                    {obligacion.rectificaciones.map((rectificacion) => (
+                      <li key={rectificacion.id} className="flex flex-col gap-1 py-3 text-sm">
+                        <p className="font-semibold text-tinta">
+                          Presentada el {formatearFecha(rectificacion.fechaPresentacion)}
+                          {rectificacion.numeroOrden === null ? '' : ` · N.° de orden ${rectificacion.numeroOrden}`}
+                        </p>
+                        <p className="whitespace-pre-line text-tinta">{rectificacion.motivo}</p>
+                        <p className="text-xs text-apagado">
+                          {rectificacion.registradoPor} · {formatearFechaHora(rectificacion.registradoEn)} ·{' '}
+                          <a
+                            href={`/archivos/${rectificacion.constancia.id}`}
+                            target="_blank"
+                            rel="noopener"
+                            className="font-semibold text-marino-claro hover:underline"
+                          >
+                            {rectificacion.constancia.nombre}
+                          </a>
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {obligacion.puedeRectificar ? (
+                  <FormularioRectificacion
+                    accion={rectificarObligacion.bind(null, obligacion.id)}
+                    fechaHoy={fechaHoyEnLima()}
+                    fechaMinima={obligacion.fechaPresentacion ?? `${obligacion.periodo}-01`}
+                  />
+                ) : null}
+              </div>
+            </Tarjeta>
+          ) : null}
         </div>
         <Tarjeta titulo="Datos">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
