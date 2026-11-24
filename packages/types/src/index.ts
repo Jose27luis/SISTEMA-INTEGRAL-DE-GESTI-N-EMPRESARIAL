@@ -6,6 +6,7 @@ export * from './common';
 export * from './health';
 export * from './identity-documents';
 export * from './notifications';
+export * from './obligations';
 export * from './permissions';
 export * from './reports';
 export * from './roles';
