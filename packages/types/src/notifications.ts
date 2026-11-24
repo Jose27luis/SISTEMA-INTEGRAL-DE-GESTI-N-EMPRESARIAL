@@ -13,6 +13,9 @@ export const TIPOS_NOTIFICACION = [
   'TRABAJO_OBSERVADO',
   'TRABAJO_APROBADO',
   'TAREA_CANCELADA',
+  'OBLIGACION_POR_VENCER',
+  'OBLIGACION_VENCIDA',
+  'CRONOGRAMA_FALTANTE',
 ] as const;
 
 export const esquemaTipoNotificacion = z.enum(TIPOS_NOTIFICACION);
