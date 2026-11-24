@@ -6,6 +6,7 @@ import { NotificacionesNucleoModule } from '../notifications/notifications-core.
 import { AlmacenamientoModule } from '../storage/storage.module';
 import { ArchivosController } from './files.controller';
 import { AccesoTareasService } from './task-access.service';
+import { ListaVerificacionService } from './task-checklist.service';
 import { ArchivosTareaService } from './task-files.service';
 import { AvancesTareaService } from './task-progress.service';
 import { ReasignacionTareasService } from './task-reassignment.service';
@@ -25,6 +26,7 @@ import { ConsultaTareasService } from './tasks-query.service';
     ArchivosTareaService,
     ReasignacionTareasService,
     RevisionTareasService,
+    ListaVerificacionService,
   ],
   exports: [ReasignacionTareasService, AccesoTareasService, AvancesTareaService, RevisionTareasService],
 })
