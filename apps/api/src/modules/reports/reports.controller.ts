@@ -2,10 +2,12 @@ import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import {
   esquemaFiltroPeriodo,
   esquemaFormatoExportacion,
+  esquemaPeriodo,
   type FiltroPeriodo,
   type FormatoExportacion,
   type HistorialTrabajador,
   type ReporteActividades,
+  type ReporteClientes,
   type ReportePersonal,
   type Tablero,
 } from '@sige/types';
@@ -16,6 +18,7 @@ import { Cliente, RequierePermiso, UsuarioActual } from '../../common/auth/decor
 import { fechaHoyEnLima, horaEnLima } from '../../common/dates';
 import { ValidacionZod } from '../../common/validation/zod-validation.pipe';
 import { actorDesde, AuditoriaService } from '../audit/audit.service';
+import { ReporteClientesService } from './client-report.service';
 import { TableroService } from './dashboard.service';
 import { exportarExcel, exportarPdf, type TablaExportable } from './report-exporter';
 import { ReportesService } from './reports.service';
@@ -23,6 +26,22 @@ import { HistorialTrabajadorService } from './staff-history.service';
 
 const validarFiltro = new ValidacionZod(esquemaFiltroPeriodo);
 const validarFormato = new ValidacionZod(esquemaFormatoExportacion.optional());
+
+const validarFiltroClientes = new ValidacionZod(z.object({ periodo: esquemaPeriodo.optional() }));
+
+function detallesDeFiltro(filtro: FiltroPeriodo): Record<string, string | null> {
+  return {
+    desde: filtro.desde,
+    hasta: filtro.hasta,
+    areaId: filtro.areaId ?? null,
+    usuarioId: filtro.usuarioId ?? null,
+  };
+}
+
+function periodoAnterior(hoy: string): string {
+  const [anio, mes] = hoy.split('-').map(Number);
+  return new Date(Date.UTC(anio ?? 2000, (mes ?? 1) - 2, 1)).toISOString().slice(0, 7);
+}
 
 const TIPOS_CONTENIDO: Record<FormatoExportacion, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -36,6 +55,7 @@ export class ReportesController {
     private readonly historial: HistorialTrabajadorService,
     private readonly reportes: ReportesService,
     private readonly auditoria: AuditoriaService,
+    private readonly reporteClientes: ReporteClientesService,
   ) {}
 
   @Get('tablero')
@@ -77,7 +97,7 @@ export class ReportesController {
       this.reportes.tablaPersonal(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), this.momento()),
       `reporte-personal-${filtro.desde}-al-${filtro.hasta}`,
       formato,
-      filtro,
+      detallesDeFiltro(filtro),
       usuario,
       cliente,
       respuesta,
@@ -104,7 +124,35 @@ export class ReportesController {
       this.reportes.tablaActividades(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), this.momento()),
       `reporte-actividades-${filtro.desde}-al-${filtro.hasta}`,
       formato,
-      filtro,
+      detallesDeFiltro(filtro),
+      usuario,
+      cliente,
+      respuesta,
+    );
+    return undefined;
+  }
+
+  @Get('reportes/clientes')
+  @RequierePermiso('reporte:clientes')
+  async clientes(
+    @Query(validarFiltroClientes) filtro: { periodo?: string | undefined },
+    @Query('formato', validarFormato) formato: FormatoExportacion | undefined,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+    @Res({ passthrough: true }) respuesta: Response,
+  ): Promise<ReporteClientes | undefined> {
+    const periodo = filtro.periodo ?? periodoAnterior(fechaHoyEnLima());
+    const reporte = await this.reporteClientes.obtener(usuario, periodo);
+
+    if (formato === undefined) {
+      return reporte;
+    }
+
+    await this.enviarArchivo(
+      this.reporteClientes.tabla(reporte, await this.reportes.nombreUsuario(usuario.usuarioId), this.momento()),
+      `reporte-clientes-${periodo}`,
+      formato,
+      { periodo },
       usuario,
       cliente,
       respuesta,
@@ -121,7 +169,7 @@ export class ReportesController {
     tabla: TablaExportable,
     nombre: string,
     formato: FormatoExportacion,
-    filtro: FiltroPeriodo,
+    detalles: Record<string, string | null>,
     usuario: UsuarioAutenticado,
     cliente: ContextoCliente,
     respuesta: Response,
@@ -133,15 +181,7 @@ export class ReportesController {
       accion: 'DESCARGAR',
       entidad: 'reporte',
       entidadId: null,
-      despues: {
-        reporte: tabla.titulo,
-        formato,
-        desde: filtro.desde,
-        hasta: filtro.hasta,
-        areaId: filtro.areaId ?? null,
-        usuarioId: filtro.usuarioId ?? null,
-        filas: tabla.filas.length,
-      },
+      despues: { reporte: tabla.titulo, formato, ...detalles, filas: tabla.filas.length },
     });
 
     respuesta.setHeader('Content-Type', TIPOS_CONTENIDO[formato]);
