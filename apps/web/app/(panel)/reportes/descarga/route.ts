@@ -1,4 +1,4 @@
-import { esquemaFiltroPeriodo, esquemaFormatoExportacion, esquemaPeriodo } from '@sige/types';
+import { esquemaFiltroPeriodo, esquemaFiltroRangoMeses, esquemaFormatoExportacion, esquemaPeriodo } from '@sige/types';
 import { type NextRequest, NextResponse } from 'next/server';
 import { descargarDeApi } from '@/lib/api';
 
@@ -9,8 +9,34 @@ const FILTRO_NO_VALIDO = new NextResponse('Los filtros del reporte no son válid
   headers: { 'Content-Type': 'text/plain; charset=utf-8' },
 });
 
+const REPORTES_POR_RANGO = new Set(['honorarios', 'flujo-caja', 'rentabilidad']);
+
 function rutaDelReporte(parametros: URLSearchParams, formato: string): string | null {
   const tipo = parametros.get('tipo');
+
+  if (tipo === 'cuentas-por-cobrar') {
+    return `/reportes/cuentas-por-cobrar?${new URLSearchParams({ formato }).toString()}`;
+  }
+
+  if (tipo !== null && REPORTES_POR_RANGO.has(tipo)) {
+    const rango = esquemaFiltroRangoMeses.safeParse({ desde: parametros.get('desde') ?? '', hasta: parametros.get('hasta') ?? '' });
+
+    if (!rango.success) {
+      return null;
+    }
+
+    const consulta = new URLSearchParams({ formato });
+
+    if (rango.data.desde !== undefined) {
+      consulta.set('desde', rango.data.desde);
+    }
+
+    if (rango.data.hasta !== undefined) {
+      consulta.set('hasta', rango.data.hasta);
+    }
+
+    return `/reportes/${tipo}?${consulta.toString()}`;
+  }
 
   if (tipo === 'clientes') {
     const periodo = esquemaPeriodo.safeParse(parametros.get('periodo') ?? '');
