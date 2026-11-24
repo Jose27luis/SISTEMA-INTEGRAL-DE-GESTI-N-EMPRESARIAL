@@ -177,6 +177,7 @@ export const esquemaTareaDetalle = esquemaTareaResumen.extend({
   minutosRegistrados: z.number().int().nonnegative(),
   version: z.number().int().positive(),
   creadoEn: z.iso.datetime(),
+  obligacionId: z.uuid().nullable(),
   avances: z.array(esquemaAvance),
   comentarios: z.array(esquemaComentario),
   transiciones: z.array(esquemaTransicion),
