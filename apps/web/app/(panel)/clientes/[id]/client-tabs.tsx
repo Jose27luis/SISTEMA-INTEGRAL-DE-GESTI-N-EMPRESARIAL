@@ -10,6 +10,7 @@ interface PropiedadesPestanas {
   totalContactos: number;
   totalEquipo: number;
   verObligaciones: boolean;
+  verDocumentos: boolean;
 }
 
 export function PestanasCliente({
@@ -17,6 +18,7 @@ export function PestanasCliente({
   totalContactos,
   totalEquipo,
   verObligaciones,
+  verDocumentos,
 }: PropiedadesPestanas): ReactNode {
   const ruta = usePathname();
   const base = `/clientes/${clienteId}`;
@@ -25,6 +27,7 @@ export function PestanasCliente({
     { href: `${base}/contactos`, etiqueta: `Contactos (${String(totalContactos)})` },
     { href: `${base}/equipo`, etiqueta: `Equipo (${String(totalEquipo)})` },
     ...(verObligaciones ? [{ href: `${base}/obligaciones`, etiqueta: 'Obligaciones' }] : []),
+    ...(verDocumentos ? [{ href: `${base}/documentos`, etiqueta: 'Documentos' }] : []),
     { href: `${base}/historial`, etiqueta: 'Historial' },
   ];
 
