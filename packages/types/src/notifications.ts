@@ -21,6 +21,7 @@ export const TIPOS_NOTIFICACION = [
   'DOCUMENTACION_FALTANTE',
   'ACCESO_POR_REVISAR',
   'INCIDENCIA_ASIGNADA',
+  'PAGO_VENCIDO',
 ] as const;
 
 export const esquemaTipoNotificacion = z.enum(TIPOS_NOTIFICACION);
