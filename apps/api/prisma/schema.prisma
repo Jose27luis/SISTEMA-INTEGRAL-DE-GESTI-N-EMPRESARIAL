@@ -25,6 +25,7 @@ enum AccionAuditoria {
   CAMBIAR_ESTADO
   DESCARGAR
   ARCHIVAR
+  CONSULTAR
 }
 
 model Usuario {
@@ -76,6 +77,16 @@ model Usuario {
   versionesCargadas       VersionDocumento[]
   carpetasCreadas         Carpeta[]
   documentosEsperados     DocumentoEsperado[]
+  rectificaciones         Rectificacion[]
+  itemsCompletados        ItemVerificacion[]
+  plantillasCreadas       PlantillaTarea[]
+  reglasResponsable       ReglaRecurrencia[]   @relation("ResponsableDeRegla")
+  reglasRevisor           ReglaRecurrencia[]   @relation("RevisorDeRegla")
+  reglasCreadas           ReglaRecurrencia[]   @relation("CreadorDeRegla")
+  accesosAutorizados      AccesoPlataforma[]   @relation("AutorizadoDeAcceso")
+  accesosActualizados     AccesoPlataforma[]   @relation("ActualizadorDeAcceso")
+  incidenciasResponsable  Incidencia[]         @relation("ResponsableDeIncidencia")
+  incidenciasRegistradas  Incidencia[]         @relation("RegistradorDeIncidencia")
 
   @@map("usuarios")
 }
@@ -338,6 +349,9 @@ model Cliente {
   documentos        Documento[]
   carpetas          Carpeta[]
   documentosEsperados DocumentoEsperado[]
+  reglasRecurrencia ReglaRecurrencia[]
+  accesos           AccesoPlataforma[]
+  incidencias       Incidencia[]
 
   @@index([estado, razonSocial])
   @@map("clientes")
@@ -417,6 +431,8 @@ enum TipoNotificacion {
   DOCUMENTO_POR_VENCER
   DOCUMENTO_VENCIDO
   DOCUMENTACION_FALTANTE
+  ACCESO_POR_REVISAR
+  INCIDENCIA_ASIGNADA
 }
 
 enum DecisionRevision {
@@ -450,6 +466,9 @@ model Tarea {
   minutosRegistrados Int         @default(0) @map("minutos_registrados")
   motivoCancelacion  String?     @map("motivo_cancelacion")
   completadaEn       DateTime?   @map("completada_en") @db.Timestamptz(3)
+  plantillaId        String?     @map("plantilla_id") @db.Uuid
+  reglaId            String?     @map("regla_id") @db.Uuid
+  fechaOcurrencia    DateTime?   @map("fecha_ocurrencia") @db.Date
   version            Int         @default(1)
   creadoEn           DateTime    @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn      DateTime    @updatedAt @map("actualizado_en") @db.Timestamptz(3)
@@ -464,7 +483,11 @@ model Tarea {
   comentarios   ComentarioTarea[]
   rondas        RondaRevision[]
   obligacion    ObligacionPeriodo?
+  plantilla     PlantillaTarea?    @relation(fields: [plantillaId], references: [id])
+  regla         ReglaRecurrencia?  @relation(fields: [reglaId], references: [id])
+  items         ItemVerificacion[]
 
+  @@unique([reglaId, fechaOcurrencia])
   @@index([responsableId, estado, fechaLimite])
   @@index([completadaEn])
   @@index([clienteId, estado])
@@ -560,6 +583,7 @@ model Archivo {
   evidencias Evidencia[]
   constancias ObligacionPeriodo[]
   versiones   VersionDocumento[]
+  rectificaciones Rectificacion[]
 
   @@map("archivos")
 }
@@ -708,6 +732,7 @@ model ObligacionPeriodo {
   obligacionCliente ObligacionCliente @relation(fields: [obligacionClienteId], references: [id])
   tarea             Tarea             @relation(fields: [tareaId], references: [id])
   constancia        Archivo?          @relation(fields: [constanciaId], references: [id])
+  rectificaciones   Rectificacion[]
 
   @@unique([obligacionClienteId, periodo])
   @@index([fechaVencimiento])
@@ -825,4 +850,165 @@ model DocumentoEsperado {
   @@index([clienteId, periodo])
   @@index([fechaLimite])
   @@map("documentos_esperados")
+}
+
+model Rectificacion {
+  id                  String   @id @default(uuid()) @db.Uuid
+  obligacionPeriodoId String   @map("obligacion_periodo_id") @db.Uuid
+  motivo              String
+  fechaPresentacion   DateTime @map("fecha_presentacion") @db.Date
+  numeroOrden         String?  @map("numero_orden")
+  constanciaId        String   @map("constancia_id") @db.Uuid
+  registradoPorId     String   @map("registrado_por_id") @db.Uuid
+  registradoEn        DateTime @default(now()) @map("registrado_en") @db.Timestamptz(3)
+
+  obligacionPeriodo ObligacionPeriodo @relation(fields: [obligacionPeriodoId], references: [id])
+  constancia        Archivo           @relation(fields: [constanciaId], references: [id])
+  registradoPor     Usuario           @relation(fields: [registradoPorId], references: [id])
+
+  @@index([obligacionPeriodoId, registradoEn])
+  @@map("rectificaciones")
+}
+
+enum Frecuencia {
+  MENSUAL
+  SEMANAL
+}
+
+model PlantillaTarea {
+  id                 String    @id @default(uuid()) @db.Uuid
+  nombre             String    @unique @db.Citext
+  titulo             String
+  instrucciones      String?
+  prioridad          Prioridad @default(MEDIA)
+  diasPlazo          Int       @default(0) @map("dias_plazo")
+  requiereAprobacion Boolean   @default(false) @map("requiere_aprobacion")
+  requiereEvidencia  Boolean   @default(false) @map("requiere_evidencia")
+  evidenciaRequerida String?   @map("evidencia_requerida")
+  items              String[]  @default([])
+  activo             Boolean   @default(true)
+  creadoPorId        String    @map("creado_por_id") @db.Uuid
+  creadoEn           DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn      DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  creadoPor Usuario            @relation(fields: [creadoPorId], references: [id])
+  reglas    ReglaRecurrencia[]
+  tareas    Tarea[]
+
+  @@map("plantillas_tarea")
+}
+
+model ReglaRecurrencia {
+  id            String     @id @default(uuid()) @db.Uuid
+  plantillaId   String     @map("plantilla_id") @db.Uuid
+  clienteId     String?    @map("cliente_id") @db.Uuid
+  responsableId String     @map("responsable_id") @db.Uuid
+  revisorId     String?    @map("revisor_id") @db.Uuid
+  frecuencia    Frecuencia
+  diaDelMes     Int?       @map("dia_del_mes")
+  diaDeSemana   Int?       @map("dia_de_semana")
+  vigenteDesde  DateTime   @map("vigente_desde") @db.Date
+  vigenteHasta  DateTime?  @map("vigente_hasta") @db.Date
+  activo        Boolean    @default(true)
+  creadoPorId   String     @map("creado_por_id") @db.Uuid
+  creadoEn      DateTime   @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime   @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  plantilla   PlantillaTarea @relation(fields: [plantillaId], references: [id])
+  cliente     Cliente?       @relation(fields: [clienteId], references: [id])
+  responsable Usuario        @relation("ResponsableDeRegla", fields: [responsableId], references: [id])
+  revisor     Usuario?       @relation("RevisorDeRegla", fields: [revisorId], references: [id])
+  creadoPor   Usuario        @relation("CreadorDeRegla", fields: [creadoPorId], references: [id])
+  tareas      Tarea[]
+
+  @@index([activo])
+  @@map("reglas_recurrencia")
+}
+
+model ItemVerificacion {
+  id              String    @id @default(uuid()) @db.Uuid
+  tareaId         String    @map("tarea_id") @db.Uuid
+  texto           String
+  orden           Int
+  completadoEn    DateTime? @map("completado_en") @db.Timestamptz(3)
+  completadoPorId String?   @map("completado_por_id") @db.Uuid
+
+  tarea         Tarea    @relation(fields: [tareaId], references: [id])
+  completadoPor Usuario? @relation(fields: [completadoPorId], references: [id])
+
+  @@unique([tareaId, orden])
+  @@map("items_verificacion")
+}
+
+enum EstadoAcceso {
+  ACTIVO
+  SUSPENDIDO
+  DADO_DE_BAJA
+}
+
+model Plataforma {
+  id            String   @id @default(uuid()) @db.Uuid
+  nombre        String   @unique @db.Citext
+  urlPorDefecto String?  @map("url_por_defecto")
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  accesos AccesoPlataforma[]
+
+  @@map("plataformas")
+}
+
+model AccesoPlataforma {
+  id                      String       @id @default(uuid()) @db.Uuid
+  clienteId               String       @map("cliente_id") @db.Uuid
+  plataformaId            String       @map("plataforma_id") @db.Uuid
+  url                     String?
+  identificador           String?
+  responsableAutorizadoId String       @map("responsable_autorizado_id") @db.Uuid
+  fechaRevision           DateTime     @map("fecha_revision") @db.Date
+  estado                  EstadoAcceso @default(ACTIVO)
+  tieneMfa                Boolean      @default(false) @map("tiene_mfa")
+  referenciaBoveda        String       @map("referencia_boveda")
+  notas                   String?
+  actualizadoPorId        String       @map("actualizado_por_id") @db.Uuid
+  creadoEn                DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn           DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  cliente               Cliente    @relation(fields: [clienteId], references: [id])
+  plataforma            Plataforma @relation(fields: [plataformaId], references: [id])
+  responsableAutorizado Usuario    @relation("AutorizadoDeAcceso", fields: [responsableAutorizadoId], references: [id])
+  actualizadoPor        Usuario    @relation("ActualizadorDeAcceso", fields: [actualizadoPorId], references: [id])
+
+  @@index([clienteId, estado])
+  @@index([fechaRevision])
+  @@map("accesos_plataforma")
+}
+
+enum EstadoIncidencia {
+  ABIERTA
+  EN_ATENCION
+  RESUELTA
+  ANULADA
+}
+
+model Incidencia {
+  id              String           @id @default(uuid()) @db.Uuid
+  clienteId       String           @map("cliente_id") @db.Uuid
+  titulo          String
+  descripcion     String
+  fecha           DateTime         @db.Date
+  responsableId   String           @map("responsable_id") @db.Uuid
+  estado          EstadoIncidencia @default(ABIERTA)
+  resolucion      String?
+  resueltaEn      DateTime?        @map("resuelta_en") @db.Timestamptz(3)
+  registradaPorId String           @map("registrada_por_id") @db.Uuid
+  registradaEn    DateTime         @default(now()) @map("registrada_en") @db.Timestamptz(3)
+  actualizadoEn   DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  cliente       Cliente @relation(fields: [clienteId], references: [id])
+  responsable   Usuario @relation("ResponsableDeIncidencia", fields: [responsableId], references: [id])
+  registradaPor Usuario @relation("RegistradorDeIncidencia", fields: [registradaPorId], references: [id])
+
+  @@index([clienteId, estado])
+  @@map("incidencias")
 }
