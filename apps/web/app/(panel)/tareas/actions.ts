@@ -7,6 +7,7 @@ import {
   esquemaEdicionTarea,
   esquemaEnvioEntrada,
   esquemaFinalizacionEntrada,
+  esquemaItemEntrada,
   esquemaRevisionEntrada,
   esquemaTareaDetalle,
   esquemaTareaEntrada,
@@ -45,7 +46,61 @@ function leerTarea(datos: FormData): Record<string, unknown> {
     requiereAprobacion: leerCasilla(datos, 'requiereAprobacion'),
     requiereEvidencia: leerCasilla(datos, 'requiereEvidencia'),
     evidenciaRequerida: leerTexto(datos, 'evidenciaRequerida'),
+    plantillaId: leerOpcional(datos, 'plantillaId'),
+    items: leerTexto(datos, 'items')
+      .split('\n')
+      .map((linea) => linea.trim())
+      .filter((linea) => linea !== ''),
   };
+}
+
+export async function agregarItem(id: string, _anterior: EstadoFormulario, datos: FormData): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success) {
+    return ERROR_TAREA;
+  }
+
+  const valores = valoresDeFormulario(datos);
+  const entrada = esquemaItemEntrada.safeParse({ texto: leerTexto(datos, 'texto') });
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  const resultado = await solicitarApi(`/tareas/${id}/items`, {
+    metodo: 'POST',
+    cuerpo: entrada.data,
+    esquema: esquemaTareaDetalle,
+  });
+
+  if (!resultado.ok) {
+    return estadoConError(resultado.error, valores);
+  }
+
+  revalidatePath(`/tareas/${id}`);
+  return estadoExitoso('Ítem agregado.');
+}
+
+export async function marcarItem(
+  id: string,
+  itemId: string,
+  completado: boolean,
+): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(itemId).success) {
+    return ERROR_TAREA;
+  }
+
+  const resultado = await solicitarApi(`/tareas/${id}/items/${itemId}`, {
+    metodo: 'POST',
+    cuerpo: { completado },
+    esquema: esquemaTareaDetalle,
+  });
+
+  if (!resultado.ok) {
+    return estadoConError(resultado.error);
+  }
+
+  revalidatePath(`/tareas/${id}`);
+  return estadoExitoso(completado ? 'Ítem completado.' : 'Ítem reabierto.');
 }
 
 export async function crearTarea(_anterior: EstadoFormulario, datos: FormData): Promise<EstadoFormulario> {
