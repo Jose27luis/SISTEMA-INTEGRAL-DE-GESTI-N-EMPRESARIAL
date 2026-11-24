@@ -26,6 +26,7 @@ enum AccionAuditoria {
   DESCARGAR
   ARCHIVAR
   CONSULTAR
+  ANULAR
 }
 
 model Usuario {
@@ -87,6 +88,13 @@ model Usuario {
   accesosActualizados     AccesoPlataforma[]   @relation("ActualizadorDeAcceso")
   incidenciasResponsable  Incidencia[]         @relation("ResponsableDeIncidencia")
   incidenciasRegistradas  Incidencia[]         @relation("RegistradorDeIncidencia")
+  ingresosCreados         Ingreso[]            @relation("CreadorDeIngreso")
+  ingresosAnulados        Ingreso[]            @relation("AnuladorDeIngreso")
+  cobrosRegistrados       Cobro[]              @relation("RegistradorDeCobro")
+  cobrosAnulados          Cobro[]              @relation("AnuladorDeCobro")
+  egresosResponsable      Egreso[]             @relation("ResponsableDeEgreso")
+  egresosCreados          Egreso[]             @relation("CreadorDeEgreso")
+  egresosAnulados         Egreso[]             @relation("AnuladorDeEgreso")
 
   @@map("usuarios")
 }
@@ -352,6 +360,10 @@ model Cliente {
   reglasRecurrencia ReglaRecurrencia[]
   accesos           AccesoPlataforma[]
   incidencias       Incidencia[]
+  contrato          ContratoCliente?
+  serviciosContratados ServicioContratado[]
+  ingresos          Ingreso[]
+  egresos           Egreso[]
 
   @@index([estado, razonSocial])
   @@map("clientes")
@@ -433,6 +445,7 @@ enum TipoNotificacion {
   DOCUMENTACION_FALTANTE
   ACCESO_POR_REVISAR
   INCIDENCIA_ASIGNADA
+  PAGO_VENCIDO
 }
 
 enum DecisionRevision {
@@ -584,6 +597,8 @@ model Archivo {
   constancias ObligacionPeriodo[]
   versiones   VersionDocumento[]
   rectificaciones Rectificacion[]
+  vouchers        Cobro[]
+  comprobantesEgreso Egreso[]
 
   @@map("archivos")
 }
@@ -803,6 +818,7 @@ model Documento {
   archivadoPor  Usuario?            @relation("ArchivadorDeDocumento", fields: [archivadoPorId], references: [id])
   versiones     VersionDocumento[]
   esperados     DocumentoEsperado[]
+  contratos     ContratoCliente[]
 
   @@index([clienteId, archivadoEn])
   @@index([carpetaId])
@@ -1011,4 +1027,203 @@ model Incidencia {
 
   @@index([clienteId, estado])
   @@map("incidencias")
+}
+
+enum TipoServicio {
+  RECURRENTE
+  PROYECTO
+}
+
+enum Periodicidad {
+  MENSUAL
+  ANUAL
+  UNICO
+}
+
+enum TipoComprobante {
+  FACTURA
+  BOLETA
+  RECIBO_HONORARIOS
+  NOTA_VENTA
+  TICKET
+  OTRO
+}
+
+model Servicio {
+  id       String       @id @default(uuid()) @db.Uuid
+  nombre   String       @unique @db.Citext
+  tipo     TipoServicio
+  activo   Boolean      @default(true)
+  creadoEn DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  contratados ServicioContratado[]
+
+  @@map("servicios")
+}
+
+model ServicioContratado {
+  id            String       @id @default(uuid()) @db.Uuid
+  clienteId     String       @map("cliente_id") @db.Uuid
+  servicioId    String       @map("servicio_id") @db.Uuid
+  honorario     Decimal      @db.Decimal(12, 2)
+  periodicidad  Periodicidad
+  desde         DateTime     @db.Date
+  hasta         DateTime?    @db.Date
+  observaciones String?
+  activo        Boolean      @default(true)
+  creadoEn      DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  cliente  Cliente   @relation(fields: [clienteId], references: [id])
+  servicio Servicio  @relation(fields: [servicioId], references: [id])
+  ingresos Ingreso[]
+
+  @@index([clienteId, activo])
+  @@map("servicios_contratados")
+}
+
+model ContratoCliente {
+  id              String    @id @default(uuid()) @db.Uuid
+  clienteId       String    @unique @map("cliente_id") @db.Uuid
+  inicio          DateTime  @db.Date
+  vencimiento     DateTime? @db.Date
+  diaPago         Int       @map("dia_pago")
+  condicionesPago String?   @map("condiciones_pago")
+  observaciones   String?
+  documentoId     String?   @map("documento_id") @db.Uuid
+  creadoEn        DateTime  @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn   DateTime  @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  cliente   Cliente    @relation(fields: [clienteId], references: [id])
+  documento Documento? @relation(fields: [documentoId], references: [id])
+
+  @@map("contratos_cliente")
+}
+
+model MedioPago {
+  id       String   @id @default(uuid()) @db.Uuid
+  nombre   String   @unique @db.Citext
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  cobros  Cobro[]
+  egresos Egreso[]
+
+  @@map("medios_pago")
+}
+
+model CategoriaEgreso {
+  id       String   @id @default(uuid()) @db.Uuid
+  nombre   String   @unique @db.Citext
+  activo   Boolean  @default(true)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  egresos Egreso[]
+
+  @@map("categorias_egreso")
+}
+
+model Proveedor {
+  id          String   @id @default(uuid()) @db.Uuid
+  razonSocial String   @map("razon_social")
+  ruc         String?  @unique @db.VarChar(11)
+  contacto    String?
+  activo      Boolean  @default(true)
+  creadoEn    DateTime @default(now()) @map("creado_en") @db.Timestamptz(3)
+
+  egresos Egreso[]
+
+  @@map("proveedores")
+}
+
+model Ingreso {
+  id                   String           @id @default(uuid()) @db.Uuid
+  clienteId            String           @map("cliente_id") @db.Uuid
+  servicioContratadoId String?          @map("servicio_contratado_id") @db.Uuid
+  concepto             String
+  periodo              String?          @db.Char(7)
+  tipoComprobante      TipoComprobante? @map("tipo_comprobante")
+  serieNumero          String?          @map("serie_numero")
+  fechaEmision         DateTime         @map("fecha_emision") @db.Date
+  fechaVencimiento     DateTime         @map("fecha_vencimiento") @db.Date
+  monto                Decimal          @db.Decimal(12, 2)
+  montoPagado          Decimal          @default(0) @map("monto_pagado") @db.Decimal(12, 2)
+  saldo                Decimal          @db.Decimal(12, 2)
+  generadoAutomaticamente Boolean       @default(false) @map("generado_automaticamente")
+  creadoPorId          String?          @map("creado_por_id") @db.Uuid
+  creadoEn             DateTime         @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn        DateTime         @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+  anuladoEn            DateTime?        @map("anulado_en") @db.Timestamptz(3)
+  anuladoPorId         String?          @map("anulado_por_id") @db.Uuid
+  motivoAnulacion      String?          @map("motivo_anulacion")
+
+  cliente            Cliente             @relation(fields: [clienteId], references: [id])
+  servicioContratado ServicioContratado? @relation(fields: [servicioContratadoId], references: [id])
+  creadoPor          Usuario?            @relation("CreadorDeIngreso", fields: [creadoPorId], references: [id])
+  anuladoPor         Usuario?            @relation("AnuladorDeIngreso", fields: [anuladoPorId], references: [id])
+  cobros             Cobro[]
+
+  @@index([clienteId, fechaVencimiento])
+  @@index([fechaVencimiento, saldo])
+  @@index([periodo])
+  @@map("ingresos")
+}
+
+model Cobro {
+  id              String    @id @default(uuid()) @db.Uuid
+  ingresoId       String    @map("ingreso_id") @db.Uuid
+  fecha           DateTime  @db.Date
+  importe         Decimal   @db.Decimal(12, 2)
+  medioPagoId     String    @map("medio_pago_id") @db.Uuid
+  operacion       String?
+  voucherId       String?   @map("voucher_id") @db.Uuid
+  registradoPorId String    @map("registrado_por_id") @db.Uuid
+  registradoEn    DateTime  @default(now()) @map("registrado_en") @db.Timestamptz(3)
+  anuladoEn       DateTime? @map("anulado_en") @db.Timestamptz(3)
+  anuladoPorId    String?   @map("anulado_por_id") @db.Uuid
+  motivoAnulacion String?   @map("motivo_anulacion")
+
+  ingreso       Ingreso   @relation(fields: [ingresoId], references: [id])
+  medioPago     MedioPago @relation(fields: [medioPagoId], references: [id])
+  voucher       Archivo?  @relation(fields: [voucherId], references: [id])
+  registradoPor Usuario   @relation("RegistradorDeCobro", fields: [registradoPorId], references: [id])
+  anuladoPor    Usuario?  @relation("AnuladorDeCobro", fields: [anuladoPorId], references: [id])
+
+  @@index([ingresoId])
+  @@index([fecha])
+  @@map("cobros")
+}
+
+model Egreso {
+  id              String           @id @default(uuid()) @db.Uuid
+  concepto        String
+  proveedorId     String?          @map("proveedor_id") @db.Uuid
+  fecha           DateTime         @db.Date
+  importe         Decimal          @db.Decimal(12, 2)
+  categoriaId     String           @map("categoria_id") @db.Uuid
+  tipoComprobante TipoComprobante? @map("tipo_comprobante")
+  serieNumero     String?          @map("serie_numero")
+  comprobanteId   String?          @map("comprobante_id") @db.Uuid
+  responsableId   String           @map("responsable_id") @db.Uuid
+  medioPagoId     String           @map("medio_pago_id") @db.Uuid
+  clienteId       String?          @map("cliente_id") @db.Uuid
+  observaciones   String?
+  creadoPorId     String           @map("creado_por_id") @db.Uuid
+  creadoEn        DateTime         @default(now()) @map("creado_en") @db.Timestamptz(3)
+  anuladoEn       DateTime?        @map("anulado_en") @db.Timestamptz(3)
+  anuladoPorId    String?          @map("anulado_por_id") @db.Uuid
+  motivoAnulacion String?          @map("motivo_anulacion")
+
+  proveedor   Proveedor?      @relation(fields: [proveedorId], references: [id])
+  categoria   CategoriaEgreso @relation(fields: [categoriaId], references: [id])
+  comprobante Archivo?        @relation(fields: [comprobanteId], references: [id])
+  responsable Usuario         @relation("ResponsableDeEgreso", fields: [responsableId], references: [id])
+  medioPago   MedioPago       @relation(fields: [medioPagoId], references: [id])
+  cliente     Cliente?        @relation(fields: [clienteId], references: [id])
+  creadoPor   Usuario         @relation("CreadorDeEgreso", fields: [creadoPorId], references: [id])
+  anuladoPor  Usuario?        @relation("AnuladorDeEgreso", fields: [anuladoPorId], references: [id])
+
+  @@index([fecha])
+  @@index([categoriaId])
+  @@map("egresos")
 }
