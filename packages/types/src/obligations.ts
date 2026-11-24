@@ -318,9 +318,51 @@ export const esquemaObligacionDetalle = esquemaObligacionResumen.extend({
   aprobacion: z.object({ revisor: z.string(), fecha: z.iso.datetime() }).nullable(),
   generadaEn: z.iso.datetime(),
   puedePresentar: z.boolean(),
+  rectificaciones: z.array(
+    z.object({
+      id: z.uuid(),
+      motivo: z.string(),
+      fechaPresentacion: z.iso.date(),
+      numeroOrden: z.string().nullable(),
+      constancia: z.object({ id: z.uuid(), nombre: z.string(), tamanoBytes: z.number().int() }),
+      registradoPor: z.string(),
+      registradoEn: z.iso.datetime(),
+    }),
+  ),
+  puedeRectificar: z.boolean(),
 });
 
 export type ObligacionDetalle = z.infer<typeof esquemaObligacionDetalle>;
+
+export const esquemaRectificacionEntrada = z.object({
+  motivo: z.string().trim().min(5, 'Explique el motivo de la rectificación.').max(1000),
+  fechaPresentacion: z.iso.date('Ingrese la fecha de presentación.'),
+  numeroOrden: textoOpcional(40),
+});
+
+export type RectificacionEntrada = z.infer<typeof esquemaRectificacionEntrada>;
+
+export const esquemaHistorialTributario = z.object({
+  clienteId: z.uuid(),
+  periodos: z.array(
+    esquemaObligacionResumen.extend({
+      numeroOrden: z.string().nullable(),
+      observaciones: z.string().nullable(),
+      constancia: z.object({ id: z.uuid(), nombre: z.string() }).nullable(),
+      rectificaciones: z.array(
+        z.object({
+          id: z.uuid(),
+          motivo: z.string(),
+          fechaPresentacion: z.iso.date(),
+          numeroOrden: z.string().nullable(),
+          constancia: z.object({ id: z.uuid(), nombre: z.string() }),
+        }),
+      ),
+    }),
+  ),
+});
+
+export type HistorialTributario = z.infer<typeof esquemaHistorialTributario>;
 
 export const esquemaIndicadoresTributarios = z.object({
   porVencer: z.number().int().nonnegative(),
