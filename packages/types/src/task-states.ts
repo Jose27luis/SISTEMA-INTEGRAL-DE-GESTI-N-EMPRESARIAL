@@ -80,6 +80,22 @@ export function estadoTrasAccion(
   }
 }
 
+export function accionAlRegistrarAvance(actual: EstadoTarea): AccionTarea | null {
+  if (actual === 'PENDIENTE') {
+    return 'INICIAR';
+  }
+
+  return actual === 'OBSERVADA' ? 'CORREGIR' : null;
+}
+
+export function accionDeEnvio(actual: EstadoTarea): AccionTarea | null {
+  if (actual === 'EN_PROCESO') {
+    return 'TERMINAR';
+  }
+
+  return actual === 'CORREGIDA' ? 'REENVIAR' : null;
+}
+
 export function estaAtrasada(estado: EstadoTarea, fechaLimite: string, hoy: string): boolean {
   return !ESTADOS_CERRADOS.includes(estado) && fechaLimite < hoy;
 }
