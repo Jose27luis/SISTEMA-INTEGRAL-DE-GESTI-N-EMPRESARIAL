@@ -24,10 +24,14 @@ import {
   esquemaEnvioEntrada,
   esquemaFiltroTareas,
   esquemaFinalizacionEntrada,
+  esquemaItemEntrada,
+  esquemaMarcaItem,
   esquemaRevisionEntrada,
   esquemaTareaEntrada,
   type FiltroTareas,
   type FinalizacionEntrada,
+  type ItemEntrada,
+  type MarcaItem,
   MAXIMO_EVIDENCIAS_POR_AVANCE,
   type MiTrabajo,
   type OpcionesTarea,
@@ -42,6 +46,7 @@ import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/auth
 import { Cliente, RequierePermiso, UsuarioActual } from '../../common/auth/decorators';
 import { ValidacionZod } from '../../common/validation/zod-validation.pipe';
 import { AccesoTareasService } from './task-access.service';
+import { ListaVerificacionService } from './task-checklist.service';
 import { AvancesTareaService } from './task-progress.service';
 import { RevisionTareasService } from './task-review.service';
 import { GestionTareasService } from './tasks-command.service';
@@ -57,6 +62,7 @@ export class TareasController {
     private readonly gestion: GestionTareasService,
     private readonly avances: AvancesTareaService,
     private readonly revision: RevisionTareasService,
+    private readonly lista: ListaVerificacionService,
   ) {}
 
   @Get()
@@ -124,6 +130,31 @@ export class TareasController {
     @Cliente() cliente: ContextoCliente,
   ): Promise<TareaDetalle> {
     await this.gestion.iniciar(id, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/items')
+  @RequierePermiso('tarea:ver')
+  async agregarItem(
+    @Param('id', validarId) id: string,
+    @Body(new ValidacionZod(esquemaItemEntrada)) datos: ItemEntrada,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.lista.agregar(id, datos.texto, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/items/:itemId')
+  @RequierePermiso('tarea:ver')
+  async marcarItem(
+    @Param('id', validarId) id: string,
+    @Param('itemId', validarId) itemId: string,
+    @Body(new ValidacionZod(esquemaMarcaItem)) datos: MarcaItem,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.lista.marcar(id, itemId, datos.completado, usuario, cliente);
     return this.consulta.obtener(id, usuario);
   }
 
