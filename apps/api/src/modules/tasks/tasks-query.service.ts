@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
+  accionDeEnvio,
   ESTADOS_CERRADOS,
   ESTADOS_CON_AVANCE,
+  estadoTrasAccion,
   type FiltroTareas,
   type MiTrabajo,
   type OpcionesTarea,
@@ -11,7 +13,7 @@ import {
   type TareaResumen,
 } from '@sige/types';
 import type { UsuarioAutenticado } from '../../common/auth/authenticated-request';
-import { aFechaDb, aIso, fechaHoyEnLima } from '../../common/dates';
+import { aFechaDb, aIso, aIsoONulo, fechaHoyEnLima } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccesoTareasService } from './task-access.service';
 import { aResumenTarea, INCLUSION_RESUMEN_TAREA } from './task-mappers';
@@ -62,6 +64,14 @@ export class ConsultaTareasService {
 
     if (filtro.responsableId !== undefined) {
       condiciones.push({ responsableId: filtro.responsableId });
+    }
+
+    if (filtro.revisorId !== undefined) {
+      condiciones.push({ revisorId: filtro.revisorId });
+    }
+
+    if (filtro.areaId !== undefined) {
+      condiciones.push({ responsable: { trabajador: { areaId: filtro.areaId } } });
     }
 
     if (filtro.clienteId !== undefined) {
@@ -180,6 +190,7 @@ export class ConsultaTareasService {
         },
         comentarios: { orderBy: { creadoEn: 'asc' }, include: { autor: { select: { id: true, nombre: true } } } },
         transiciones: { orderBy: { fecha: 'desc' }, include: { usuario: { select: { nombre: true } } } },
+        rondas: { orderBy: { numero: 'desc' }, include: { revisor: { select: { id: true, nombre: true } } } },
       },
     });
 
@@ -205,6 +216,8 @@ export class ConsultaTareasService {
     const ejecuta =
       tarea.responsableId === usuario.usuarioId || colaboradores.some(({ id: colaboradorId }) => colaboradorId === usuario.usuarioId);
     const abierta = !ESTADOS_CERRADOS.includes(tarea.estado);
+    const gestiona =
+      usuario.permisos.has('tarea:crear') && (tarea.asignadoPorId === usuario.usuarioId || usuario.alcanceGlobal);
 
     return {
       ...aResumenTarea(tarea, hoy),
@@ -256,14 +269,30 @@ export class ConsultaTareasService {
         fecha: aIso(transicion.fecha),
       })),
       participantes: [...participantes.values()],
+      motivoCancelacion: tarea.motivoCancelacion,
+      completadaEn: aIsoONulo(tarea.completadaEn),
+      rondas: tarea.rondas.map((ronda) => ({
+        id: ronda.id,
+        numero: ronda.numero,
+        revisor: ronda.revisor,
+        decision: ronda.decision,
+        comentario: ronda.comentario,
+        fecha: aIso(ronda.fecha),
+      })),
+      evidenciasAdjuntas: tarea.avances.reduce((suma, avance) => suma + avance.evidencias.length, 0),
       acciones: {
-        editar:
-          abierta &&
-          usuario.permisos.has('tarea:crear') &&
-          (tarea.asignadoPorId === usuario.usuarioId || usuario.alcanceGlobal),
+        editar: abierta && gestiona,
         iniciar: tarea.estado === 'PENDIENTE' && ejecuta,
         registrarAvance: ESTADOS_CON_AVANCE.includes(tarea.estado) && ejecuta,
         comentar: true,
+        enviar: accionDeEnvio(tarea.estado) !== null && ejecuta,
+        revisar:
+          tarea.estado === 'EN_REVISION' &&
+          !ejecuta &&
+          usuario.permisos.has('tarea:revisar') &&
+          (tarea.revisorId === usuario.usuarioId || usuario.alcanceGlobal),
+        finalizar: tarea.estado === 'APROBADA' && gestiona,
+        cancelar: estadoTrasAccion(tarea.estado, 'CANCELAR', true) !== null && gestiona,
       },
     };
   }
