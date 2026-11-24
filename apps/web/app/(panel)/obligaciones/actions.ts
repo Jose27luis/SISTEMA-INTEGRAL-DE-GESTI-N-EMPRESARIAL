@@ -9,6 +9,7 @@ import {
   esquemaObligacionClienteEntrada,
   esquemaObligacionDetalle,
   esquemaPresentacionEntrada,
+  esquemaRectificacionEntrada,
   esquemaResultadoGeneracion,
   esquemaTipoObligacionEntrada,
   ETIQUETAS_MOTIVO_OMISION,
@@ -57,6 +58,61 @@ function revalidarObligaciones(clienteId?: string): void {
   if (clienteId !== undefined) {
     revalidatePath(`/clientes/${clienteId}/obligaciones`);
   }
+}
+
+export async function rectificarObligacion(
+  id: string,
+  _anterior: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  if (!idsValidos(id)) {
+    return ERROR_IDENTIFICADOR;
+  }
+
+  const valores = valoresDeFormulario(datos);
+  const campos = {
+    motivo: leerTexto(datos, 'motivo'),
+    fechaPresentacion: leerTexto(datos, 'fechaPresentacion'),
+    numeroOrden: leerTexto(datos, 'numeroOrden'),
+  };
+  const entrada = esquemaRectificacionEntrada.safeParse(campos);
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  const constancia = datos.get('constancia');
+
+  if (!(constancia instanceof File) || constancia.size === 0 || constancia.size > TAMANO_MAXIMO_CONSTANCIA_MB * 1024 * 1024) {
+    return estadoConError(
+      {
+        mensaje: 'Adjunte la constancia de la rectificación.',
+        errores: [{ campo: 'constancia', mensaje: `PDF o imagen de hasta ${String(TAMANO_MAXIMO_CONSTANCIA_MB)} MB.` }],
+      },
+      valores,
+    );
+  }
+
+  const formulario = new FormData();
+
+  for (const [clave, valor] of Object.entries(campos)) {
+    formulario.set(clave, valor);
+  }
+
+  formulario.append('constancia', constancia, constancia.name);
+
+  const resultado = await solicitarApi(`/obligaciones/${id}/rectificaciones`, {
+    metodo: 'POST',
+    formulario,
+    esquema: esquemaObligacionDetalle,
+  });
+
+  if (!resultado.ok) {
+    return estadoConError(resultado.error, valores);
+  }
+
+  revalidarObligaciones(resultado.datos.cliente.id);
+  return estadoExitoso('Rectificación registrada con su constancia.');
 }
 
 export async function presentarObligacion(
