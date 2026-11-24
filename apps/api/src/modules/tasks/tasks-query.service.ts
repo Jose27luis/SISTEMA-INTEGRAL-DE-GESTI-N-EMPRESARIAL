@@ -191,6 +191,7 @@ export class ConsultaTareasService {
         comentarios: { orderBy: { creadoEn: 'asc' }, include: { autor: { select: { id: true, nombre: true } } } },
         transiciones: { orderBy: { fecha: 'desc' }, include: { usuario: { select: { nombre: true } } } },
         rondas: { orderBy: { numero: 'desc' }, include: { revisor: { select: { id: true, nombre: true } } } },
+        obligacion: { select: { id: true } },
       },
     });
 
@@ -231,6 +232,7 @@ export class ConsultaTareasService {
       minutosRegistrados: tarea.minutosRegistrados,
       version: tarea.version,
       creadoEn: aIso(tarea.creadoEn),
+      obligacionId: tarea.obligacion?.id ?? null,
       avances: tarea.avances.map((avance) => ({
         id: avance.id,
         registradoEn: aIso(avance.registradoEn),
