@@ -15,6 +15,7 @@ import { PermisosEfectivosService } from '../access-control/effective-permission
 import { actorDesde, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
 import { NotificacionesService } from '../notifications/notifications.service';
 import { AccesoTareasService } from './task-access.service';
+import { generarCodigoTarea } from './task-code';
 
 function datosTarea(entrada: TareaEntrada): {
   titulo: string;
@@ -61,7 +62,7 @@ export class GestionTareasService {
     const notificados: string[] = [];
 
     const tareaId = await this.prisma.$transaction(async (tx) => {
-      const codigo = await this.generarCodigo(tx);
+      const codigo = await generarCodigoTarea(tx);
       const tarea = await tx.tarea.create({
         data: { ...datosTarea(entrada), codigo, asignadoPorId: usuario.usuarioId },
       });
@@ -356,15 +357,5 @@ export class GestionTareasService {
         });
       }
     }
-  }
-
-  private async generarCodigo(db: ClienteBaseDatos): Promise<string> {
-    const [fila] = await db.$queryRaw<{ numero: bigint }[]>`SELECT nextval('tareas_codigo_seq') AS numero`;
-
-    if (fila === undefined) {
-      throw new Error('No se pudo generar el código de la tarea');
-    }
-
-    return `T-${String(new Date().getFullYear())}-${fila.numero.toString().padStart(6, '0')}`;
   }
 }
