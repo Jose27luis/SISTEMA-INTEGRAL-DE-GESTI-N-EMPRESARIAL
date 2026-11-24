@@ -37,6 +37,8 @@ export class ArchivosTareaService {
       include: {
         evidencias: { take: 1, select: { avance: { select: { tareaId: true } } } },
         versiones: { take: 1, select: { documentoId: true, numero: true } },
+        vouchers: { take: 1, select: { id: true } },
+        comprobantesEgreso: { take: 1, select: { id: true } },
       },
     });
 
@@ -46,8 +48,24 @@ export class ArchivosTareaService {
 
     const tareaId = archivo.evidencias[0]?.avance.tareaId;
     const version = archivo.versiones[0];
+    const financiero = archivo.vouchers.length > 0 || archivo.comprobantesEgreso.length > 0;
 
-    if (version !== undefined) {
+    if (financiero) {
+      const permitido =
+        archivo.comprobantesEgreso.length > 0 ? usuario.permisos.has('finanza:egresos') : usuario.permisos.has('comercial:ver');
+
+      if (!permitido) {
+        await this.auditoria.registrar({
+          actor: actorDesde(usuario, contexto),
+          accion: 'PERMISO_DENEGADO',
+          entidad: 'archivo',
+          entidadId: archivo.id,
+          motivo: 'Archivo financiero sin permiso',
+        });
+
+        throw new ForbiddenException({ mensaje: 'No tiene acceso a este archivo.', errores: [] });
+      }
+    } else if (version !== undefined) {
       const visible = usuario.permisos.has('documento:ver')
         ? await this.prisma.documento.count({
             where: { AND: [{ id: version.documentoId }, filtroDocumentosVisibles(usuario)] },
