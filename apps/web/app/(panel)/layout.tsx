@@ -3,6 +3,7 @@ import { Menu } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { Marca } from '@/components/brand';
+import { BuscadorGeneral } from '@/components/global-search';
 import { MenuNavegacion } from '@/components/navigation-menu';
 import { CampanaNotificaciones } from '@/components/notification-bell';
 import { PanelUsuario } from '@/components/user-panel';
@@ -59,7 +60,12 @@ export default async function LayoutPanel({ children }: PropiedadesLayoutPanel):
           </div>
         </div>
         <div className="h-1 bg-dorado md:hidden" />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-8 sm:py-8">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-8 sm:py-8">
+          <div className="mb-6 flex justify-end">
+            <BuscadorGeneral />
+          </div>
+          {children}
+        </main>
       </div>
     </div>
   );
