@@ -1,4 +1,4 @@
-import { esquemaOpcionesTarea, esquemaTablero, type TareaResumen } from '@sige/types';
+import { esquemaIndicadoresTributarios, esquemaOpcionesTarea, esquemaTablero, type TareaResumen } from '@sige/types';
 import { cn } from '@sige/ui/cn';
 import { Alerta, Insignia, Tarjeta } from '@sige/ui/components';
 import type { Metadata } from 'next';
@@ -103,10 +103,13 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
     consulta.set('usuarioId', usuarioId);
   }
 
-  const [tablero, areas, opciones] = await Promise.all([
+  const [tablero, areas, opciones, tributario] = await Promise.all([
     solicitarApi(`/tablero?${consulta.toString()}`, { esquema: esquemaTablero }),
     verEquipo ? opcionesCatalogo('areas') : Promise.resolve(undefined),
     verEquipo ? solicitarApi('/tareas/opciones', { esquema: esquemaOpcionesTarea }) : Promise.resolve(null),
+    tienePermiso(perfil, 'obligacion:ver')
+      ? solicitarApi('/obligaciones/indicadores', { esquema: esquemaIndicadoresTributarios })
+      : Promise.resolve(null),
   ]);
 
   const filtroTareas = new URLSearchParams();
@@ -214,6 +217,55 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
                 />
               </section>
             )}
+
+            {tributario?.ok === true ? (
+              <section aria-label="Obligaciones tributarias" className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="grid grid-cols-2 gap-3">
+                  <Indicador
+                    etiqueta="Obligaciones por vencer"
+                    valor={tributario.datos.porVencer}
+                    detalle="En los próximos 7 días"
+                    enlace="/obligaciones?vista=lista"
+                  />
+                  <Indicador
+                    etiqueta="Obligaciones vencidas"
+                    valor={tributario.datos.vencidas}
+                    detalle="Sin presentación registrada"
+                    enlace="/obligaciones?vista=control"
+                    tono={tributario.datos.vencidas > 0 ? 'alerta' : 'normal'}
+                  />
+                  <Indicador
+                    etiqueta="Presentadas"
+                    valor={tributario.datos.presentadasDelMes}
+                    detalle="Con constancia este mes"
+                  />
+                  <Indicador
+                    etiqueta="Servicios cumplidos"
+                    valor={tributario.datos.cumplidasDelMes}
+                    detalle="Obligaciones cerradas este mes"
+                    tono="exito"
+                  />
+                </div>
+                <Tarjeta titulo="Próximos vencimientos tributarios">
+                  {tributario.datos.proximas.length === 0 ? (
+                    <p className="text-sm text-apagado">No hay obligaciones pendientes en los próximos 7 días.</p>
+                  ) : (
+                    <ul className="flex flex-col divide-y divide-borde">
+                      {tributario.datos.proximas.map((obligacion) => (
+                        <li key={obligacion.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                          <Link href={`/obligaciones/${obligacion.id}`} className="min-w-0 truncate font-medium text-marino hover:underline">
+                            {obligacion.tipoObligacion.codigo} · {obligacion.cliente.razonSocial}
+                          </Link>
+                          <span className={cn('shrink-0 text-xs font-semibold', obligacion.vencida ? 'text-rojo' : 'text-apagado')}>
+                            {obligacion.vencida ? 'Venció' : 'Vence'} {formatearFecha(obligacion.fechaVencimiento)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Tarjeta>
+              </section>
+            ) : null}
 
             <div className="grid gap-6 lg:grid-cols-3">
               <Tarjeta titulo={`Atrasadas (${String(tablero.datos.equipo.atrasadas)})`}>
