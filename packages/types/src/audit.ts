@@ -11,6 +11,11 @@ export const ACCIONES_AUDITORIA = [
   'SALIR',
   'REVOCAR_SESION',
   'PERMISO_DENEGADO',
+  'CAMBIAR_ESTADO',
+  'DESCARGAR',
+  'ARCHIVAR',
+  'CONSULTAR',
+  'ANULAR',
 ] as const;
 
 export const esquemaAccionAuditoria = z.enum(ACCIONES_AUDITORIA);
@@ -27,6 +32,11 @@ export const ETIQUETAS_ACCION_AUDITORIA: Record<AccionAuditoria, string> = {
   SALIR: 'Cierre de sesión',
   REVOCAR_SESION: 'Revocación de sesión',
   PERMISO_DENEGADO: 'Permiso denegado',
+  CAMBIAR_ESTADO: 'Cambio de estado',
+  DESCARGAR: 'Descarga',
+  ARCHIVAR: 'Archivo',
+  CONSULTAR: 'Consulta',
+  ANULAR: 'Anulación',
 };
 
 export const esquemaRegistroAuditoria = z.object({
