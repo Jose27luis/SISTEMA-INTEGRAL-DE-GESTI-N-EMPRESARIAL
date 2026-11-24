@@ -13,18 +13,26 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
   type AvanceEntrada,
+  type CancelacionEntrada,
   type ComentarioEntrada,
   type EdicionTarea,
+  type EnvioEntrada,
   esquemaAvanceEntrada,
+  esquemaCancelacionEntrada,
   esquemaComentarioEntrada,
   esquemaEdicionTarea,
+  esquemaEnvioEntrada,
   esquemaFiltroTareas,
+  esquemaFinalizacionEntrada,
+  esquemaRevisionEntrada,
   esquemaTareaEntrada,
   type FiltroTareas,
+  type FinalizacionEntrada,
   MAXIMO_EVIDENCIAS_POR_AVANCE,
   type MiTrabajo,
   type OpcionesTarea,
   type PaginaTareas,
+  type RevisionEntrada,
   TAMANO_MAXIMO_EVIDENCIA_MB,
   type TareaDetalle,
   type TareaEntrada,
@@ -35,6 +43,7 @@ import { Cliente, RequierePermiso, UsuarioActual } from '../../common/auth/decor
 import { ValidacionZod } from '../../common/validation/zod-validation.pipe';
 import { AccesoTareasService } from './task-access.service';
 import { AvancesTareaService } from './task-progress.service';
+import { RevisionTareasService } from './task-review.service';
 import { GestionTareasService } from './tasks-command.service';
 import { ConsultaTareasService } from './tasks-query.service';
 
@@ -47,6 +56,7 @@ export class TareasController {
     private readonly consulta: ConsultaTareasService,
     private readonly gestion: GestionTareasService,
     private readonly avances: AvancesTareaService,
+    private readonly revision: RevisionTareasService,
   ) {}
 
   @Get()
@@ -141,6 +151,58 @@ export class TareasController {
       usuario,
       cliente,
     );
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/envio')
+  @HttpCode(200)
+  @RequierePermiso('tarea:ver')
+  async enviar(
+    @Param('id', validarId) id: string,
+    @Body(new ValidacionZod(esquemaEnvioEntrada)) datos: EnvioEntrada,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.revision.enviar(id, datos, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/revision')
+  @HttpCode(200)
+  @RequierePermiso('tarea:revisar')
+  async revisar(
+    @Param('id', validarId) id: string,
+    @Body(new ValidacionZod(esquemaRevisionEntrada)) datos: RevisionEntrada,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.revision.revisar(id, datos, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/finalizacion')
+  @HttpCode(200)
+  @RequierePermiso('tarea:crear')
+  async finalizar(
+    @Param('id', validarId) id: string,
+    @Body(new ValidacionZod(esquemaFinalizacionEntrada)) datos: FinalizacionEntrada,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.revision.finalizar(id, datos, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/cancelacion')
+  @HttpCode(200)
+  @RequierePermiso('tarea:crear')
+  async cancelar(
+    @Param('id', validarId) id: string,
+    @Body(new ValidacionZod(esquemaCancelacionEntrada)) datos: CancelacionEntrada,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.revision.cancelar(id, datos, usuario, cliente);
     return this.consulta.obtener(id, usuario);
   }
 
