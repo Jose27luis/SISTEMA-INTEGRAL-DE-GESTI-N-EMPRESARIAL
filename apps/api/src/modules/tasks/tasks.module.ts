@@ -26,6 +26,6 @@ import { ConsultaTareasService } from './tasks-query.service';
     ReasignacionTareasService,
     RevisionTareasService,
   ],
-  exports: [ReasignacionTareasService, AccesoTareasService],
+  exports: [ReasignacionTareasService, AccesoTareasService, AvancesTareaService, RevisionTareasService],
 })
 export class TareasModule {}
