@@ -151,6 +151,21 @@ export const esquemaTransicion = z.object({
   fecha: z.iso.datetime(),
 });
 
+export const DECISIONES_REVISION = ['APROBADA', 'OBSERVADA'] as const;
+
+export const esquemaDecisionRevision = z.enum(DECISIONES_REVISION);
+
+export type DecisionRevision = z.infer<typeof esquemaDecisionRevision>;
+
+export const esquemaRondaRevision = z.object({
+  id: z.uuid(),
+  numero: z.number().int().positive(),
+  revisor: esquemaPersona,
+  decision: esquemaDecisionRevision,
+  comentario: z.string().nullable(),
+  fecha: z.iso.datetime(),
+});
+
 export const esquemaTareaDetalle = esquemaTareaResumen.extend({
   instrucciones: z.string().nullable(),
   revisor: esquemaPersona.nullable(),
@@ -166,11 +181,19 @@ export const esquemaTareaDetalle = esquemaTareaResumen.extend({
   comentarios: z.array(esquemaComentario),
   transiciones: z.array(esquemaTransicion),
   participantes: z.array(esquemaPersona),
+  motivoCancelacion: z.string().nullable(),
+  completadaEn: z.iso.datetime().nullable(),
+  rondas: z.array(esquemaRondaRevision),
+  evidenciasAdjuntas: z.number().int().nonnegative(),
   acciones: z.object({
     editar: z.boolean(),
     iniciar: z.boolean(),
     registrarAvance: z.boolean(),
     comentar: z.boolean(),
+    enviar: z.boolean(),
+    revisar: z.boolean(),
+    finalizar: z.boolean(),
+    cancelar: z.boolean(),
   }),
 });
 
@@ -188,6 +211,33 @@ export const esquemaAvanceEntrada = z.object({
     .transform((valor) => (valor === '' ? null : valor))
     .pipe(z.uuid().nullable())
     .nullable(),
+});
+
+export const esquemaEnvioEntrada = z.object({
+  comentario: textoOpcional(1000),
+});
+
+export const esquemaRevisionEntrada = z
+  .object({
+    decision: esquemaDecisionRevision,
+    comentario: textoOpcional(2000),
+  })
+  .superRefine((revision, contexto) => {
+    if (revision.decision === 'OBSERVADA' && (revision.comentario === null || revision.comentario.length < 5)) {
+      contexto.addIssue({
+        code: 'custom',
+        path: ['comentario'],
+        message: 'Indique qué debe corregirse (mínimo 5 caracteres).',
+      });
+    }
+  });
+
+export const esquemaFinalizacionEntrada = z.object({
+  comentario: textoOpcional(1000),
+});
+
+export const esquemaCancelacionEntrada = z.object({
+  motivo: z.string().trim().min(5, 'Justifique la cancelación (mínimo 5 caracteres).').max(1000),
 });
 
 export const esquemaComentarioEntrada = z.object({
@@ -208,6 +258,8 @@ export const esquemaFiltroTareas = z.object({
     .pipe(z.union([esquemaEstadoTarea, z.enum(FILTROS_ESTADO_TAREA)]).optional())
     .optional(),
   responsableId: vacioAIndefinido.pipe(z.uuid().optional()).optional(),
+  revisorId: vacioAIndefinido.pipe(z.uuid().optional()).optional(),
+  areaId: vacioAIndefinido.pipe(z.uuid().optional()).optional(),
   clienteId: vacioAIndefinido.pipe(z.uuid().optional()).optional(),
   prioridad: vacioAIndefinido.pipe(esquemaPrioridad.optional()).optional(),
   atrasadas: vacioAIndefinido.pipe(z.literal('si').optional()).optional(),
@@ -238,6 +290,11 @@ export type Comentario = z.infer<typeof esquemaComentario>;
 export type Transicion = z.infer<typeof esquemaTransicion>;
 export type TareaDetalle = z.infer<typeof esquemaTareaDetalle>;
 export type AvanceEntrada = z.infer<typeof esquemaAvanceEntrada>;
+export type RondaRevision = z.infer<typeof esquemaRondaRevision>;
+export type EnvioEntrada = z.infer<typeof esquemaEnvioEntrada>;
+export type RevisionEntrada = z.infer<typeof esquemaRevisionEntrada>;
+export type FinalizacionEntrada = z.infer<typeof esquemaFinalizacionEntrada>;
+export type CancelacionEntrada = z.infer<typeof esquemaCancelacionEntrada>;
 export type ComentarioEntrada = z.infer<typeof esquemaComentarioEntrada>;
 export type FiltroTareas = z.infer<typeof esquemaFiltroTareas>;
 export type PaginaTareas = z.infer<typeof esquemaPaginaTareas>;
