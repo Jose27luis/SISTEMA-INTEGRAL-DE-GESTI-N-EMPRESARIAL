@@ -3278,6 +3278,103 @@ El límite de las server actions subió a 25 MB para admitir las evidencias.
 | Límite de evidencias configurable (RF-AVA-03) | Fijo en 10 archivos y 24 MB por avance; pasa a parámetros con RF-CFG-03. Subirlo exige también ampliar `client_max_body_size` en nginx. |
 | Pestaña Tareas del expediente del cliente (RF-CLI-07) | Se suma con el Sprint 4; por ahora se filtra por cliente en Tareas. |
 
+### 12.11 Sprint 4: revisión, tablero, historial y reportes
+
+**Modelo de datos** (migración `20261125120000_revision_y_reportes`):
+
+- **`rondas_revision`:** número de ronda único por tarea, revisor, decisión `APROBADA` u `OBSERVADA`, comentario y fecha. Una observación sin comentario se rechaza en la base.
+- **`tareas.completada_en`:** registra el primer paso a Aprobada o Finalizada. Las tareas ya cerradas toman esa fecha de su historial de estados.
+- **Cancelación:** una tarea Cancelada debe tener motivo; lo exige un CHECK en la base.
+- **Notificaciones nuevas:** `TAREA_POR_REVISAR`, `TRABAJO_OBSERVADO`, `TRABAJO_APROBADO` y `TAREA_CANCELADA`.
+- **Permisos nuevos**, según la matriz de la sección 3:
+  - `tarea:revisar` (aprobar u observar): Gerencia, Contabilidad y Administración.
+  - `reporte:personal` (carga del equipo y reportes de personal): Gerencia.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `POST /tareas/:id/envio` | Responsable o colaborador | Terminar (En proceso → En revisión o Finalizada) o reenviar una corrección (Corregida → En revisión). |
+| `POST /tareas/:id/revision` | `tarea:revisar` | `{ decision: APROBADA \| OBSERVADA, comentario }`; observar exige comentario. |
+| `POST /tareas/:id/finalizacion` | `tarea:crear`, quien asignó o Gerencia | Aprobada → Finalizada. |
+| `POST /tareas/:id/cancelacion` | `tarea:crear`, quien asignó o Gerencia | Con justificación obligatoria; solo desde Pendiente, En proceso u Observada. |
+| `GET /tareas?revisorId=&areaId=` | `tarea:ver` | Filtros nuevos para la bandeja de revisión y el detalle del tablero. |
+| `GET /tablero?desde=&hasta=&areaId=&usuarioId=` | `tarea:ver` | Indicadores del periodo dentro del alcance del usuario; la carga por trabajador solo con `reporte:personal`. |
+| `GET /historial/:usuarioId?desde=&hasta=` | El propio trabajador, su supervisor o Gerencia | Indicadores, tareas y avances del trabajador. |
+| `GET /reportes/personal?desde=&hasta=&areaId=[&formato=xlsx\|pdf]` | `reporte:personal` | Cumplimiento por trabajador y por área. |
+| `GET /reportes/actividades?desde=&hasta=&areaId=&usuarioId=[&formato=xlsx\|pdf]` | `reporte:personal` | Avances del periodo (diario, semanal o mensual según el rango), hasta 5000 filas. |
+
+El periodo de los indicadores no puede superar un año, y la fecha final no puede ser anterior a la inicial.
+
+**Reglas implementadas**
+
+- **Terminar (RF-TAR-04 y 05):**
+  - Si la tarea requiere aprobación pasa a En revisión y avisa al revisor; si no, queda Finalizada y avisa a quien la asignó.
+  - No se puede enviar sin evidencia si la tarea la exige, ni sin revisor si requiere aprobación.
+- **Revisar (RF-REV-01 a 05):**
+  - Revisa el revisor asignado o, con alcance global, Gerencia. Ambos necesitan `tarea:revisar`.
+  - El responsable y los colaboradores nunca pueden aprobar ni observar su propia tarea, ni siquiera llamando a la API directamente.
+  - Al asignar un revisor, se exige que tenga `tarea:revisar`.
+  - Cada decisión crea una ronda numerada y avisa al responsable, a los colaboradores y a quien asignó la tarea.
+  - El primer avance sobre una tarea Observada la pasa a Corregida; desde ahí se reenvía a revisión.
+- **Finalizar (RF-REV-06):** manual, por quien asignó la tarea o por Gerencia. El cierre automático por periodo queda para cuando existan los parámetros (RF-CFG-03).
+- **Cancelar (RF-TAR-06):** solo quien asignó la tarea o Gerencia, con justificación de al menos 5 caracteres; avisa a los participantes.
+- **Cambios de estado (RF-TAR-07):** cada cambio queda en `transiciones_tarea` (quién, cuándo, de qué estado a cuál y comentario) y en la auditoría como `CAMBIAR_ESTADO`.
+- **Indicadores:** se calculan por responsable.
+  - Asignadas: tareas creadas en el periodo.
+  - Terminadas: aprobadas o finalizadas en el periodo.
+  - Aprobadas y observadas: rondas de revisión del periodo.
+  - Abiertas y atrasadas: al día de hoy. Una tarea atrasada no es un estado, sino que se calcula (RF-TAR-09).
+  - Tiempo: minutos de los avances del periodo, por autor.
+  - Cumplimiento: de las tareas que vencen en el periodo y ya pueden evaluarse (terminadas o con la fecha límite vencida, sin contar las canceladas), el porcentaje que se completó a tiempo.
+- **Tablero (RF-GER-01 a 04, 08 y 09):**
+  - Es la página de Inicio de cada usuario con `tarea:ver`, dentro de su alcance.
+  - Muestra indicadores de actividades; clientes activos y nuevos (con `cliente:ver`); trabajadores activos y carga por trabajador (con `reporte:personal`).
+  - Lista alertas: atrasadas, urgentes sin iniciar y trabajos por revisar.
+  - Cada indicador lleva al listado que lo compone.
+- **Historial (RF-PER-06):** lo ven el propio trabajador (menú **Mi historial**), su supervisor (según la ficha) y Gerencia. Cualquier otro recibe 403, que queda registrado como `PERMISO_DENEGADO`.
+- **Reportes (RF-REP-01 a 03 y 07):**
+  - Excel (exceljs) y PDF (pdfkit, A4 horizontal) con el logotipo (`apps/api/assets/torres-logo.png`), los filtros aplicados, el usuario y la fecha y hora de Lima en que se generó.
+  - El PDF incluye números de página.
+  - El reporte de personal suma subtotales por área y un total.
+  - Ambos aplican el mismo filtro de visibilidad que las pantallas.
+  - Cada exportación queda en la auditoría como `DESCARGAR` sobre `reporte`.
+
+**Pantallas web:**
+
+- **Inicio:** tablero con periodo (hoy, semana, mes, mes anterior, año o fechas elegidas); filtros de área y trabajador para Gerencia.
+- **Por revisar:** bandeja propia y, para Gerencia, las demás tareas en revisión.
+- **Mi historial** e **Historial del trabajador**, enlazados desde la ficha del personal y desde la carga del tablero.
+- **Reportes:** personal o actividades, con vista previa y descarga en Excel o PDF a través de `/reportes/descarga`.
+- **Detalle de la tarea:**
+  - Formularios para terminar o reenviar (con aviso si falta la evidencia), para aprobar u observar, y para finalizar y cancelar con confirmación.
+  - Rondas de revisión, la última observación destacada y el motivo de cancelación.
+
+**Verificación realizada:** typecheck, lint, 59 pruebas unitarias y build. Las pruebas nuevas cubren las reglas de envío y de avance y el cálculo de indicadores y cumplimiento. Contra un stack desechable con PostgreSQL real se probaron:
+
+- **Revisor:** asignar como revisor a una asistente sin `tarea:revisar` se rechaza.
+- **Ciclo completo:**
+  - El envío sin evidencia se rechazó; con un PDF adjunto pasó a En revisión y la revisora recibió `TAREA_POR_REVISAR`.
+  - El responsable y la asistente recibieron 403 al intentar revisar.
+  - Observar sin comentario se rechazó; con comentario, la tarea quedó Observada y el responsable fue avisado.
+  - Reenviar estando Observada devolvió 409. El avance de corrección la pasó a Corregida, el reenvío a En revisión y la aprobación a Aprobada, con 2 rondas y su fecha de completado.
+  - Gerencia la finalizó; el responsable recibió 403 al intentarlo.
+- **Sin aprobación:** terminar pasó la tarea directamente a Finalizada.
+- **Cancelación:** el responsable recibió 403 y la cancelación sin motivo se rechazó. Con motivo quedó Cancelada y se avisó a los participantes.
+- **Tablero de Gerencia (noviembre):** 4 asignadas, 2 completadas, 1 aprobada, 1 observada, 1 abierta, 1 atrasada, 210 minutos y 67 % de cumplimiento, con la carga del trabajador y la tarea urgente sin iniciar. El tablero del asistente no muestra la carga del equipo.
+- **Historial:** devolvió 403 para otra asistente; el propio trabajador ve las mismas cifras que el tablero.
+- **Reportes:** JSON, Excel y PDF reales para personal y actividades, con su nombre de archivo, y el texto del PDF comprobado. Contabilidad recibe 403; 10 cambios de estado y 4 exportaciones quedaron auditados.
+- **Web:** todas las páginas nuevas se renderizaron con datos reales, y la descarga a través de la web entrega el PDF.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| RF-REV-06 Finalización automática al cerrar el periodo | Manual por ahora; se configura con RF-CFG-03. |
+| RF-GER-01 Filtro por área en indicadores para roles sin `reporte:personal` | Ven su propio alcance sin filtros de equipo. |
+| RF-REP-04 a 06 Reportes de clientes, honorarios y gerencial | Fases 2 a 4, con sus módulos. |
+| Criterio de Fase 1: simulacro de respaldo y restauración | Pendiente de ejecutar y documentar antes del cierre de la fase. |
+
 ---
 
 ## Licencia y titularidad
