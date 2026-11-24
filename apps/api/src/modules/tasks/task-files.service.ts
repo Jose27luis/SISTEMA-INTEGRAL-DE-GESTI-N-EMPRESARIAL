@@ -3,6 +3,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
 import { PrismaService } from '../../prisma/prisma.service';
 import { actorDesde, AuditoriaService } from '../audit/audit.service';
+import { filtroDocumentosVisibles } from '../documents/document-visibility';
 import { AlmacenArchivos } from '../storage/file-storage';
 import { AccesoTareasService } from './task-access.service';
 
@@ -33,7 +34,10 @@ export class ArchivosTareaService {
   ): Promise<ArchivoParaEntregar> {
     const archivo = await this.prisma.archivo.findUnique({
       where: { id: archivoId },
-      include: { evidencias: { take: 1, select: { avance: { select: { tareaId: true } } } } },
+      include: {
+        evidencias: { take: 1, select: { avance: { select: { tareaId: true } } } },
+        versiones: { take: 1, select: { documentoId: true, numero: true } },
+      },
     });
 
     if (archivo === null) {
@@ -41,8 +45,27 @@ export class ArchivosTareaService {
     }
 
     const tareaId = archivo.evidencias[0]?.avance.tareaId;
+    const version = archivo.versiones[0];
 
-    if (tareaId === undefined) {
+    if (version !== undefined) {
+      const visible = usuario.permisos.has('documento:ver')
+        ? await this.prisma.documento.count({
+            where: { AND: [{ id: version.documentoId }, filtroDocumentosVisibles(usuario)] },
+          })
+        : 0;
+
+      if (visible === 0) {
+        await this.auditoria.registrar({
+          actor: actorDesde(usuario, contexto),
+          accion: 'PERMISO_DENEGADO',
+          entidad: 'archivo',
+          entidadId: archivo.id,
+          motivo: 'Documento fuera del alcance del usuario',
+        });
+
+        throw new ForbiddenException({ mensaje: 'No tiene acceso a este archivo.', errores: [] });
+      }
+    } else if (tareaId === undefined) {
       if (!usuario.alcanceGlobal) {
         throw new ForbiddenException({ mensaje: 'No tiene acceso a este archivo.', errores: [] });
       }
@@ -55,7 +78,13 @@ export class ArchivosTareaService {
       accion: 'DESCARGAR',
       entidad: 'archivo',
       entidadId: archivo.id,
-      despues: { nombre: archivo.nombreOriginal, tareaId: tareaId ?? null, modo: descargar ? 'descarga' : 'vista' },
+      despues: {
+        nombre: archivo.nombreOriginal,
+        tareaId: tareaId ?? null,
+        documentoId: version?.documentoId ?? null,
+        version: version?.numero ?? null,
+        modo: descargar ? 'descarga' : 'vista',
+      },
     });
 
     return {
