@@ -66,6 +66,7 @@ export default async function LayoutCliente({ children, params }: PropiedadesLay
         totalEquipo={cliente.asignaciones.length}
         verObligaciones={tienePermiso(perfil, 'obligacion:ver')}
         verDocumentos={tienePermiso(perfil, 'documento:ver')}
+        verAccesos={tienePermiso(perfil, 'acceso:ver')}
       />
       {children}
     </>
