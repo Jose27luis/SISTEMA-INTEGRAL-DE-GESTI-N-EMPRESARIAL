@@ -43,7 +43,17 @@ const fechaOpcional = z
   .pipe(z.iso.date('Fecha no válida.').nullable())
   .nullable();
 
+export const MAXIMO_ITEMS_VERIFICACION = 30;
+
+export const esquemaTextoItem = z.string().trim().min(2, 'Escriba el ítem.').max(200, 'Máximo 200 caracteres.');
+
+export const esquemaListaItems = z
+  .array(esquemaTextoItem)
+  .max(MAXIMO_ITEMS_VERIFICACION, `Máximo ${String(MAXIMO_ITEMS_VERIFICACION)} ítems.`);
+
 const esquemaBaseTarea = z.object({
+  plantillaId: z.uuid().nullable().default(null),
+  items: esquemaListaItems.default([]),
   titulo: z.string().trim().min(3, 'Escriba un título de al menos 3 caracteres.').max(200),
   instrucciones: textoOpcional(5000),
   clienteId: z.uuid().nullable(),
@@ -178,6 +188,17 @@ export const esquemaTareaDetalle = esquemaTareaResumen.extend({
   version: z.number().int().positive(),
   creadoEn: z.iso.datetime(),
   obligacionId: z.uuid().nullable(),
+  plantilla: z.object({ id: z.uuid(), nombre: z.string() }).nullable(),
+  items: z.array(
+    z.object({
+      id: z.uuid(),
+      texto: z.string(),
+      orden: z.number().int(),
+      completado: z.boolean(),
+      completadoPor: z.string().nullable(),
+      completadoEn: z.iso.datetime().nullable(),
+    }),
+  ),
   avances: z.array(esquemaAvance),
   comentarios: z.array(esquemaComentario),
   transiciones: z.array(esquemaTransicion),
