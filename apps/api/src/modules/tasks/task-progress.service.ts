@@ -2,8 +2,8 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable 
 import {
   type AvanceEntrada,
   type ComentarioEntrada,
+  accionAlRegistrarAvance,
   ESTADOS_CON_AVANCE,
-  estadoTrasAccion,
   MAXIMO_EVIDENCIAS_POR_AVANCE,
 } from '@sige/types';
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
@@ -13,6 +13,7 @@ import { NotificacionesService } from '../notifications/notifications.service';
 import { detectarTipoArchivo, nombreSeguro, type TipoArchivo } from '../storage/file-signature';
 import { AlmacenArchivos, type ArchivoGuardado } from '../storage/file-storage';
 import { AccesoTareasService } from './task-access.service';
+import { GestionTareasService } from './tasks-command.service';
 
 export interface ArchivoRecibido {
   nombre: string;
@@ -33,6 +34,7 @@ export class AvancesTareaService {
     private readonly auditoria: AuditoriaService,
     private readonly notificaciones: NotificacionesService,
     private readonly almacen: AlmacenArchivos,
+    private readonly gestion: GestionTareasService,
   ) {}
 
   async registrar(
@@ -56,7 +58,7 @@ export class AvancesTareaService {
 
     const tarea = await this.prisma.tarea.findUniqueOrThrow({
       where: { id: tareaId },
-      select: { codigo: true, titulo: true, estado: true, requiereAprobacion: true },
+      select: { codigo: true, titulo: true, estado: true },
     });
 
     if (!ESTADOS_CON_AVANCE.includes(tarea.estado)) {
@@ -116,21 +118,17 @@ export class AvancesTareaService {
         },
       });
 
-      if (tarea.estado === 'PENDIENTE') {
-        const destino = estadoTrasAccion('PENDIENTE', 'INICIAR', tarea.requiereAprobacion);
+      const accion = accionAlRegistrarAvance(tarea.estado);
 
-        if (destino !== null) {
-          await tx.tarea.update({ where: { id: tareaId }, data: { estado: destino } });
-          await tx.transicionTarea.create({
-            data: {
-              tareaId,
-              desde: 'PENDIENTE',
-              hacia: destino,
-              usuarioId: usuario.usuarioId,
-              comentario: 'Iniciada al registrar el primer avance',
-            },
-          });
-        }
+      if (accion !== null) {
+        await this.gestion.cambiarEstado(
+          tareaId,
+          accion,
+          usuario,
+          contexto,
+          accion === 'INICIAR' ? 'Iniciada al registrar el primer avance' : 'Corrección registrada',
+          tx,
+        );
       }
 
       await this.auditoria.registrar(
