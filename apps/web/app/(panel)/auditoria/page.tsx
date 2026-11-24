@@ -29,6 +29,11 @@ const TONOS_ACCION: Record<AccionAuditoria, TonoInsignia> = {
   SALIR: 'neutro',
   REVOCAR_SESION: 'aviso',
   PERMISO_DENEGADO: 'peligro',
+  CAMBIAR_ESTADO: 'info',
+  DESCARGAR: 'neutro',
+  ARCHIVAR: 'aviso',
+  CONSULTAR: 'neutro',
+  ANULAR: 'peligro',
 };
 
 type ParametrosBusqueda = Record<string, string | string[] | undefined>;
