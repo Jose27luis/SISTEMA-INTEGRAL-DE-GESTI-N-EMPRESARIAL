@@ -1,4 +1,10 @@
-import { esquemaIndicadoresTributarios, esquemaOpcionesTarea, esquemaTablero, type TareaResumen } from '@sige/types';
+import {
+  esquemaIndicadoresDocumentales,
+  esquemaIndicadoresTributarios,
+  esquemaOpcionesTarea,
+  esquemaTablero,
+  type TareaResumen,
+} from '@sige/types';
 import { cn } from '@sige/ui/cn';
 import { Alerta, Insignia, Tarjeta } from '@sige/ui/components';
 import type { Metadata } from 'next';
@@ -103,12 +109,15 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
     consulta.set('usuarioId', usuarioId);
   }
 
-  const [tablero, areas, opciones, tributario] = await Promise.all([
+  const [tablero, areas, opciones, tributario, documental] = await Promise.all([
     solicitarApi(`/tablero?${consulta.toString()}`, { esquema: esquemaTablero }),
     verEquipo ? opcionesCatalogo('areas') : Promise.resolve(undefined),
     verEquipo ? solicitarApi('/tareas/opciones', { esquema: esquemaOpcionesTarea }) : Promise.resolve(null),
     tienePermiso(perfil, 'obligacion:ver')
       ? solicitarApi('/obligaciones/indicadores', { esquema: esquemaIndicadoresTributarios })
+      : Promise.resolve(null),
+    tienePermiso(perfil, 'documento:ver')
+      ? solicitarApi('/documentos/indicadores', { esquema: esquemaIndicadoresDocumentales })
       : Promise.resolve(null),
   ]);
 
@@ -264,6 +273,31 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
                     </ul>
                   )}
                 </Tarjeta>
+              </section>
+            ) : null}
+
+            {documental?.ok === true ? (
+              <section aria-label="Documentos" className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <Indicador
+                  etiqueta="Documentos por vencer"
+                  valor={documental.datos.porVencer}
+                  detalle="En los próximos 30 días"
+                  enlace="/documentos?vencimiento=por-vencer"
+                  tono={documental.datos.porVencer > 0 ? 'alerta' : 'normal'}
+                />
+                <Indicador
+                  etiqueta="Documentos vencidos"
+                  valor={documental.datos.vencidos}
+                  detalle="Licencias, poderes o contratos"
+                  enlace="/documentos?vencimiento=vencidos"
+                  tono={documental.datos.vencidos > 0 ? 'alerta' : 'normal'}
+                />
+                <Indicador
+                  etiqueta="Documentación no recibida"
+                  valor={documental.datos.documentacionAtrasada}
+                  detalle="Esperada y con plazo vencido"
+                  tono={documental.datos.documentacionAtrasada > 0 ? 'alerta' : 'normal'}
+                />
               </section>
             ) : null}
 
