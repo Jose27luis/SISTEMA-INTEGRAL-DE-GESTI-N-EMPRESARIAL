@@ -1,6 +1,7 @@
 import {
   esquemaIndicadoresDocumentales,
   esquemaIndicadoresFinancieros,
+  esquemaIndicadoresProyectos,
   esquemaIndicadoresTributarios,
   esquemaOpcionesTarea,
   esquemaTablero,
@@ -117,7 +118,7 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
     consulta.set('usuarioId', usuarioId);
   }
 
-  const [tablero, areas, opciones, tributario, documental, financiero] = await Promise.all([
+  const [tablero, areas, opciones, tributario, documental, financiero, proyectos] = await Promise.all([
     solicitarApi(`/tablero?${consulta.toString()}`, { esquema: esquemaTablero }),
     verEquipo ? opcionesCatalogo('areas') : Promise.resolve(undefined),
     verEquipo ? solicitarApi('/tareas/opciones', { esquema: esquemaOpcionesTarea }) : Promise.resolve(null),
@@ -129,6 +130,9 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
       : Promise.resolve(null),
     tienePermiso(perfil, 'finanza:ingresos')
       ? solicitarApi('/finanzas/indicadores', { esquema: esquemaIndicadoresFinancieros })
+      : Promise.resolve(null),
+    tienePermiso(perfil, 'proyecto:ver')
+      ? solicitarApi('/proyectos/indicadores', { esquema: esquemaIndicadoresProyectos })
       : Promise.resolve(null),
   ]);
 
@@ -265,6 +269,46 @@ export default async function PaginaInicio({ searchParams }: PropiedadesPaginaIn
                   enlace="/finanzas/ingresos?vencidos=si"
                   tono={financiero.datos.vencido > 0 ? 'alerta' : 'normal'}
                 />
+              </section>
+            ) : null}
+
+            {proyectos?.ok === true && (proyectos.datos.activos > 0 || proyectos.datos.finalizadosDelAnio > 0) ? (
+              <section aria-label="Proyectos" className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="grid grid-cols-3 gap-3">
+                  <Indicador etiqueta="Proyectos activos" valor={proyectos.datos.activos} enlace="/proyectos" />
+                  <Indicador
+                    etiqueta="Finalizados"
+                    valor={proyectos.datos.finalizadosDelAnio}
+                    detalle="En el año"
+                    enlace="/proyectos?estado=FINALIZADO"
+                    tono="exito"
+                  />
+                  <Indicador
+                    etiqueta="Atrasados"
+                    valor={proyectos.datos.atrasados}
+                    detalle="Entrega vencida"
+                    tono={proyectos.datos.atrasados > 0 ? 'alerta' : 'normal'}
+                  />
+                </div>
+                <Tarjeta titulo="Proyectos con dificultades">
+                  {proyectos.datos.conDificultades.length === 0 ? (
+                    <p className="text-sm text-apagado">Ningún proyecto reporta dificultades.</p>
+                  ) : (
+                    <ul className="flex flex-col divide-y divide-borde">
+                      {proyectos.datos.conDificultades.map((proyecto) => (
+                        <li key={proyecto.id} className="py-2 text-sm">
+                          <Link href={`/proyectos/${proyecto.id}`} className="font-semibold text-marino hover:underline">
+                            {proyecto.codigo} · {proyecto.nombre}
+                          </Link>
+                          <p className="text-xs text-rojo">{proyecto.detalleDificultad}</p>
+                          <p className="text-xs text-apagado">
+                            {proyecto.responsable.nombre} · {String(proyecto.avance)} % · entrega {formatearFecha(proyecto.fechaEntrega)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Tarjeta>
               </section>
             ) : null}
 
