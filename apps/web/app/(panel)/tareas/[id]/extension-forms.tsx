@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '@sige/ui/cn';
-import { AreaTexto, CampoFecha } from '@sige/ui/components';
+import { AreaTexto, CampoFecha, CampoHora } from '@sige/ui/components';
 import { type ReactNode, useActionState, useState } from 'react';
 import { MensajeFormulario } from '@/components/form-message';
 import { BotonEnvio } from '@/components/submit-button';
@@ -23,6 +23,7 @@ export function BotonAcuse({ accion }: { accion: () => Promise<EstadoFormulario>
 interface PropiedadesFormularioProrroga {
   accion: AccionFormulario;
   fechaLimite: string;
+  horaLimite: string | null;
 }
 
 function diaSiguiente(fecha: string): string {
@@ -31,7 +32,7 @@ function diaSiguiente(fecha: string): string {
   return dia.toISOString().slice(0, 10);
 }
 
-export function FormularioProrroga({ accion, fechaLimite }: PropiedadesFormularioProrroga): ReactNode {
+export function FormularioProrroga({ accion, fechaLimite, horaLimite }: PropiedadesFormularioProrroga): ReactNode {
   const [estado, accionFormulario] = useActionState(accion, ESTADO_INICIAL);
   const [abierto, setAbierto] = useState(false);
 
@@ -55,16 +56,26 @@ export function FormularioProrroga({ accion, fechaLimite }: PropiedadesFormulari
   return (
     <form action={accionFormulario} className="flex flex-col gap-4">
       <MensajeFormulario estado={estado} />
-      <CampoFecha
-        id="fecha-prorroga"
-        name="fechaPropuesta"
-        etiqueta="Nueva fecha límite"
-        ayuda="Debe ser posterior a la fecha actual. Quien asignó la tarea la aprueba o la rechaza."
-        min={diaSiguiente(fechaLimite)}
-        required
-        defaultValue={estado.exito ? undefined : estado.valores.fechaPropuesta}
-        error={estado.errores.fechaPropuesta}
-      />
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,11rem)]">
+        <CampoFecha
+          id="fecha-prorroga"
+          name="fechaPropuesta"
+          etiqueta="Nueva fecha límite"
+          ayuda="Debe ser posterior al plazo actual. Quien asignó la tarea la aprueba o la rechaza."
+          min={horaLimite === null ? diaSiguiente(fechaLimite) : fechaLimite}
+          required
+          defaultValue={estado.exito ? undefined : estado.valores.fechaPropuesta}
+          error={estado.errores.fechaPropuesta}
+        />
+        <CampoHora
+          id="hora-prorroga"
+          name="horaPropuesta"
+          etiqueta="Hora límite"
+          ayuda="Opcional. Sin hora, vence al final del día."
+          defaultValue={estado.exito ? undefined : estado.valores.horaPropuesta}
+          error={estado.errores.horaPropuesta}
+        />
+      </div>
       <AreaTexto
         id="motivo-prorroga"
         name="motivo"
