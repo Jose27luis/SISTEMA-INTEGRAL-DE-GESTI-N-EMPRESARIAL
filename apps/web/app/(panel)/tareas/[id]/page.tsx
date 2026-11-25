@@ -94,6 +94,15 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
+          {tarea.etapa === null ? null : (
+            <Alerta tono="info" titulo={`Proyecto ${tarea.etapa.proyecto.codigo}`}>
+              Parte de la etapa «{tarea.etapa.nombre}» de{' '}
+              <Link href={`/proyectos/${tarea.etapa.proyecto.id}`} className="font-semibold underline">
+                {tarea.etapa.proyecto.nombre}
+              </Link>
+              .
+            </Alerta>
+          )}
           {tarea.obligacionId === null ? null : (
             <Alerta tono="info" titulo="Tarea de una obligación tributaria">
               Registre la presentación con su constancia desde la{' '}
