@@ -93,6 +93,14 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
                 Editar
               </Link>
             ) : null}
+            {tienePermiso(perfil, 'tarea:crear') ? (
+              <Link
+                href={`/tareas/nueva?duplicar=${tarea.id}`}
+                className="inline-flex min-h-11 items-center rounded-md border border-borde bg-superficie px-4 text-sm font-semibold text-marino hover:border-marino-claro"
+              >
+                Duplicar
+              </Link>
+            ) : null}
             {tarea.acciones.iniciar ? <BotonIniciar accion={iniciarTarea.bind(null, tarea.id)} /> : null}
           </div>
         }
