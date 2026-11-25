@@ -21,6 +21,7 @@ import { BusquedaModule } from './modules/search/search.module';
 import { PersonalModule } from './modules/staff/staff.module';
 import { TareasModule } from './modules/tasks/tasks.module';
 import { PlantillasModule } from './modules/templates/templates.module';
+import { SubidasModule } from './modules/uploads/uploads.module';
 import { UsuariosModule } from './modules/users/users.module';
 
 @Module({
@@ -45,6 +46,7 @@ import { UsuariosModule } from './modules/users/users.module';
     BusquedaModule,
     FinanzasModule,
     ProyectosModule,
+    SubidasModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GuardiaSesion },
