@@ -24,6 +24,7 @@ import {
   formatearMinutos,
   formatearMoneda,
   formatearPeriodo,
+  formatearPlazo,
 } from '@/lib/format';
 import { navegacionPermitida } from '@/lib/navigation';
 import { leerRango } from '@/lib/periods';
@@ -49,7 +50,7 @@ function ListaAlertas({ tareas, vacio }: { tareas: TareaResumen[]; vacio: string
           <Link href={`/tareas/${tarea.id}`} className="flex flex-col gap-0.5 py-2.5 hover:text-marino-claro">
             <span className="text-sm font-semibold text-marino">{tarea.titulo}</span>
             <span className={cn('text-xs', tarea.atrasada ? 'text-rojo' : 'text-apagado')}>
-              {tarea.codigo} · {tarea.responsable.nombre} · Vence {formatearFecha(tarea.fechaLimite)}
+              {tarea.codigo} · {tarea.responsable.nombre} · Vence {formatearPlazo(tarea.fechaLimite, tarea.horaLimite)}
             </span>
           </Link>
         </li>
