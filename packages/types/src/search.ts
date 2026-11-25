@@ -13,6 +13,7 @@ export const esquemaResultadosBusqueda = z.object({
   clientes: z.array(z.object({ id: z.uuid(), razonSocial: z.string(), documento: z.string().nullable() })),
   tareas: z.array(z.object({ id: z.uuid(), codigo: z.string(), titulo: z.string(), cliente: z.string().nullable() })),
   documentos: z.array(z.object({ id: z.uuid(), titulo: z.string(), tipo: z.string(), cliente: z.string().nullable() })),
+  proyectos: z.array(z.object({ id: z.uuid(), codigo: z.string(), nombre: z.string(), cliente: z.string().nullable() })),
 });
 
 export type ResultadosBusqueda = z.infer<typeof esquemaResultadosBusqueda>;
