@@ -12,11 +12,14 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import {
+  type AsignacionMasiva,
   type AvanceEntrada,
   type CancelacionEntrada,
+  type CargaEquipo,
   type ComentarioEntrada,
   type EdicionTarea,
   type EnvioEntrada,
+  esquemaAsignacionMasiva,
   esquemaAvanceEntrada,
   esquemaCancelacionEntrada,
   esquemaComentarioEntrada,
@@ -32,6 +35,7 @@ import {
   esquemaTareaEntrada,
   type ProrrogaEntrada,
   type ResolucionProrroga,
+  type ResultadoAsignacionMasiva,
   type FiltroTareas,
   type FinalizacionEntrada,
   type ItemEntrada,
@@ -123,6 +127,22 @@ export class TareasController {
   @RequierePermiso('tarea:ver')
   opciones(@UsuarioActual() usuario: UsuarioAutenticado): Promise<OpcionesTarea> {
     return this.consulta.opciones(usuario);
+  }
+
+  @Get('carga')
+  @RequierePermiso('tarea:crear')
+  carga(): Promise<CargaEquipo> {
+    return this.consulta.cargaEquipo();
+  }
+
+  @Post('lote')
+  @RequierePermiso('tarea:crear')
+  crearLote(
+    @Body(new ValidacionZod(esquemaAsignacionMasiva)) datos: AsignacionMasiva,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<ResultadoAsignacionMasiva> {
+    return this.gestion.crearLote(datos, usuario, cliente);
   }
 
   @Get('mi-trabajo')
