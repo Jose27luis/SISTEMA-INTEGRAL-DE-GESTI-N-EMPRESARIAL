@@ -11,7 +11,7 @@ import {
 import { cn } from '@sige/ui/cn';
 import { Check, Minus, RotateCcw } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
-import { formatearFecha, formatearFechaHora, formatearMinutos } from '@/lib/format';
+import { formatearFecha, formatearFechaHora, formatearMinutos, formatearPlazo } from '@/lib/format';
 
 const ESTILO_SEMAFORO: Record<Semaforo, { punto: string; texto: string; fondo: string }> = {
   A_TIEMPO: { punto: 'bg-verde', texto: 'text-verde-oscuro', fondo: 'bg-verde-suave' },
@@ -75,9 +75,10 @@ interface PropiedadesBarraSeguimiento {
   seguimiento: SeguimientoTarea;
   prioridad: Prioridad;
   fechaLimite: string;
+  horaLimite: string | null;
 }
 
-export function BarraSeguimiento({ seguimiento, prioridad, fechaLimite }: PropiedadesBarraSeguimiento): ReactNode {
+export function BarraSeguimiento({ seguimiento, prioridad, fechaLimite, horaLimite }: PropiedadesBarraSeguimiento): ReactNode {
   const total = seguimiento.pasos.length;
   const alcanzado = seguimiento.pasos.findLastIndex(({ situacion }) => situacion !== 'PENDIENTE');
   const progreso = total <= 1 ? 100 : (Math.max(alcanzado, 0) / (total - 1)) * 100;
@@ -87,7 +88,7 @@ export function BarraSeguimiento({ seguimiento, prioridad, fechaLimite }: Propie
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <Semaforo semaforo={seguimiento.semaforo} />
         <span className="text-apagado">
-          Vence el <span className="font-semibold text-tinta">{formatearFecha(fechaLimite)}</span>
+          Vence el <span className="font-semibold text-tinta">{formatearPlazo(fechaLimite, horaLimite)}</span>
         </span>
         {seguimiento.limiteReporte === null ? null : (
           <span className={cn(seguimiento.sinReporte ? 'font-semibold text-rojo' : 'text-apagado')}>
