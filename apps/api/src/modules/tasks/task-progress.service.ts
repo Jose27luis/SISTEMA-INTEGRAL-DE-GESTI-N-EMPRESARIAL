@@ -64,12 +64,19 @@ export class AvancesTareaService {
 
     const tarea = await this.prisma.tarea.findUniqueOrThrow({
       where: { id: tareaId },
-      select: { codigo: true, titulo: true, estado: true },
+      select: { codigo: true, titulo: true, estado: true, seguimientoEstricto: true, recibidaEn: true },
     });
 
     if (!ESTADOS_CON_AVANCE.includes(tarea.estado)) {
       throw new ConflictException({
         mensaje: 'La tarea no admite nuevos avances en su estado actual.',
+        errores: [],
+      });
+    }
+
+    if (tarea.seguimientoEstricto && tarea.recibidaEn === null) {
+      throw new ConflictException({
+        mensaje: 'Primero el responsable debe confirmar que recibió la tarea.',
         errores: [],
       });
     }
@@ -140,6 +147,7 @@ export class AvancesTareaService {
         where: { id: tareaId },
         data: {
           porcentajeAvance: entrada.porcentaje,
+          ultimoReporteEn: new Date(),
           minutosRegistrados: { increment: entrada.minutosDedicados },
           version: { increment: 1 },
         },
