@@ -152,6 +152,7 @@ export function Seleccion({
   const tecleado = useRef({ texto: '', hasta: 0 });
   const idLista = useId();
   const conBusqueda = buscable ?? opciones.length >= MINIMO_PARA_BUSCAR;
+  const altoEstimado = Math.min(ALTO_MAXIMO_PANEL, opciones.length * 40 + (conBusqueda ? 64 : 8));
   const visibles = useMemo(() => {
     const termino = normalizar(filtro.trim());
     return termino === '' ? opciones : opciones.filter(({ etiqueta: texto }) => normalizar(texto).includes(termino));
@@ -166,7 +167,7 @@ export function Seleccion({
 
     const espacioAbajo = window.innerHeight - rect.bottom - 8;
     const espacioArriba = rect.top - 8;
-    const haciaArriba = espacioAbajo < 220 && espacioArriba > espacioAbajo;
+    const haciaArriba = espacioAbajo < Math.min(altoEstimado, 220) && espacioArriba > espacioAbajo;
 
     setPosicion({
       izquierda: rect.left,
@@ -175,7 +176,7 @@ export function Seleccion({
       abajo: haciaArriba ? window.innerHeight - rect.top + 4 : null,
       altoMaximo: Math.min(ALTO_MAXIMO_PANEL, Math.max(160, haciaArriba ? espacioArriba : espacioAbajo)),
     });
-  }, []);
+  }, [altoEstimado]);
 
   const cerrar = useCallback((devolverFoco: boolean): void => {
     setAbierto(false);
@@ -189,6 +190,17 @@ export function Seleccion({
   const abrir = (): void => {
     if (disabled === true) {
       return;
+    }
+
+    const rect = boton.current?.getBoundingClientRect();
+
+    if (rect !== undefined) {
+      const faltante = altoEstimado + 12 - (window.innerHeight - rect.bottom);
+      const disponible = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+
+      if (faltante > 0 && disponible > 0) {
+        window.scrollBy({ top: Math.min(faltante, disponible, Math.max(rect.top - 16, 0)), behavior: 'instant' });
+      }
     }
 
     calcularPosicion();
