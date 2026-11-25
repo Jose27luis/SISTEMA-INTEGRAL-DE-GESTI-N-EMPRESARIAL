@@ -3,7 +3,7 @@ import { cn } from '@sige/ui/cn';
 import { CalendarClock, Check, ClipboardList, FileCheck2, ShieldCheck, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PrioridadInsignia } from '@/components/task-badges';
-import { formatearFecha } from '@/lib/format';
+import { formatearPlazo } from '@/lib/format';
 
 export interface DatosVistaPrevia {
   titulo: string;
@@ -11,6 +11,7 @@ export interface DatosVistaPrevia {
   cliente: string | null;
   prioridad: Prioridad;
   fechaLimite: string;
+  horaLimite: string;
   responsables: string[];
   colaboradores: string[];
   revisor: string | null;
@@ -75,7 +76,10 @@ export function VistaPreviaTarea({ datos, hoy, pendientes }: PropiedadesVistaPre
                 <span className="text-apagado">Sin fecha límite</span>
               ) : (
                 <>
-                  Vence el <span className="font-semibold">{formatearFecha(datos.fechaLimite)}</span>
+                  Vence el{' '}
+                  <span className="font-semibold">
+                    {formatearPlazo(datos.fechaLimite, datos.horaLimite === '' ? null : datos.horaLimite)}
+                  </span>
                   {habiles === null ? null : (
                     <span className="text-apagado">
                       {' '}
