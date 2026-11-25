@@ -26,8 +26,12 @@ import {
   esquemaFinalizacionEntrada,
   esquemaItemEntrada,
   esquemaMarcaItem,
+  esquemaProrrogaEntrada,
+  esquemaResolucionProrroga,
   esquemaRevisionEntrada,
   esquemaTareaEntrada,
+  type ProrrogaEntrada,
+  type ResolucionProrroga,
   type FiltroTareas,
   type FinalizacionEntrada,
   type ItemEntrada,
@@ -49,6 +53,7 @@ import { AccesoTareasService } from './task-access.service';
 import { ListaVerificacionService } from './task-checklist.service';
 import { AvancesTareaService } from './task-progress.service';
 import { RevisionTareasService } from './task-review.service';
+import { SeguimientoTareasService } from './task-tracking.service';
 import { GestionTareasService } from './tasks-command.service';
 import { ConsultaTareasService } from './tasks-query.service';
 
@@ -63,7 +68,47 @@ export class TareasController {
     private readonly avances: AvancesTareaService,
     private readonly revision: RevisionTareasService,
     private readonly lista: ListaVerificacionService,
+    private readonly seguimiento: SeguimientoTareasService,
   ) {}
+
+  @Post(':id/acuse')
+  @HttpCode(200)
+  @RequierePermiso('tarea:ver')
+  async acusar(
+    @Param('id', validarId) id: string,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.seguimiento.acusar(id, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/prorrogas')
+  @HttpCode(200)
+  @RequierePermiso('tarea:ver')
+  async solicitarProrroga(
+    @Param('id', validarId) id: string,
+    @Body(new ValidacionZod(esquemaProrrogaEntrada)) datos: ProrrogaEntrada,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.seguimiento.solicitarProrroga(id, datos, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
+
+  @Post(':id/prorrogas/:prorrogaId/resolucion')
+  @HttpCode(200)
+  @RequierePermiso('tarea:ver')
+  async resolverProrroga(
+    @Param('id', validarId) id: string,
+    @Param('prorrogaId', validarId) prorrogaId: string,
+    @Body(new ValidacionZod(esquemaResolucionProrroga)) datos: ResolucionProrroga,
+    @UsuarioActual() usuario: UsuarioAutenticado,
+    @Cliente() cliente: ContextoCliente,
+  ): Promise<TareaDetalle> {
+    await this.seguimiento.resolverProrroga(id, prorrogaId, datos, usuario, cliente);
+    return this.consulta.obtener(id, usuario);
+  }
 
   @Get()
   @RequierePermiso('tarea:ver')
