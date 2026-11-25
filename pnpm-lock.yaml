@@ -210,12 +210,18 @@ importers:
       '@types/react':
         specifier: ^19.2.18
         version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.2.5
+        version: 19.3.0(@types/react@19.3.0)
       eslint:
         specifier: ^10.15.0
         version: 10.15.0(jiti@2.7.0)
       react:
         specifier: ^19.2.8
         version: 19.3.1
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.3.1(react@19.3.1)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
