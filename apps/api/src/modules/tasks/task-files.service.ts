@@ -4,6 +4,7 @@ import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/auth
 import { PrismaService } from '../../prisma/prisma.service';
 import { actorDesde, AuditoriaService } from '../audit/audit.service';
 import { filtroDocumentosVisibles } from '../documents/document-visibility';
+import { filtroProyectosVisibles } from '../projects/project-visibility';
 import { AlmacenArchivos } from '../storage/file-storage';
 import { AccesoTareasService } from './task-access.service';
 
@@ -39,6 +40,7 @@ export class ArchivosTareaService {
         versiones: { take: 1, select: { documentoId: true, numero: true } },
         vouchers: { take: 1, select: { id: true } },
         comprobantesEgreso: { take: 1, select: { id: true } },
+        entregables: { take: 1, select: { etapa: { select: { proyectoId: true } } } },
       },
     });
 
@@ -49,8 +51,25 @@ export class ArchivosTareaService {
     const tareaId = archivo.evidencias[0]?.avance.tareaId;
     const version = archivo.versiones[0];
     const financiero = archivo.vouchers.length > 0 || archivo.comprobantesEgreso.length > 0;
+    const proyectoId = archivo.entregables[0]?.etapa.proyectoId;
 
-    if (financiero) {
+    if (proyectoId !== undefined) {
+      const visible = usuario.permisos.has('proyecto:ver')
+        ? await this.prisma.proyecto.count({ where: { AND: [{ id: proyectoId }, filtroProyectosVisibles(usuario)] } })
+        : 0;
+
+      if (visible === 0) {
+        await this.auditoria.registrar({
+          actor: actorDesde(usuario, contexto),
+          accion: 'PERMISO_DENEGADO',
+          entidad: 'archivo',
+          entidadId: archivo.id,
+          motivo: 'Entregable de un proyecto fuera del alcance del usuario',
+        });
+
+        throw new ForbiddenException({ mensaje: 'No tiene acceso a este archivo.', errores: [] });
+      }
+    } else if (financiero) {
       const permitido =
         archivo.comprobantesEgreso.length > 0 ? usuario.permisos.has('finanza:egresos') : usuario.permisos.has('comercial:ver');
 
