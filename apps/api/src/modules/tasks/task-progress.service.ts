@@ -13,6 +13,7 @@ import { actorDesde, AuditoriaService } from '../audit/audit.service';
 import { NotificacionesService } from '../notifications/notifications.service';
 import { detectarTipoArchivo, nombreSeguro, type TipoArchivo } from '../storage/file-signature';
 import { AlmacenArchivos, type ArchivoGuardado } from '../storage/file-storage';
+import { SubidasService } from '../uploads/uploads.service';
 import { AccesoTareasService } from './task-access.service';
 import { GestionTareasService } from './tasks-command.service';
 
@@ -38,6 +39,7 @@ export class AvancesTareaService {
     private readonly notificaciones: NotificacionesService,
     private readonly almacen: AlmacenArchivos,
     private readonly gestion: GestionTareasService,
+    private readonly subidas: SubidasService,
   ) {}
 
   async registrar(
@@ -94,9 +96,24 @@ export class AvancesTareaService {
       });
     }
 
+    const { subidaIds, ...datosAvance } = entrada;
+
+    if (evidencias.length + subidaIds.length > MAXIMO_EVIDENCIAS_POR_AVANCE) {
+      throw new BadRequestException({
+        mensaje: `Puede adjuntar como máximo ${String(MAXIMO_EVIDENCIAS_POR_AVANCE)} archivos por avance.`,
+        errores: [{ campo: 'evidencias', mensaje: 'Reduzca la cantidad de archivos.' }],
+      });
+    }
+
     const notificados = await this.prisma.$transaction(async (tx) => {
-      const avance = await tx.avance.create({ data: { ...entrada, tareaId, autorId: usuario.usuarioId } });
+      const avance = await tx.avance.create({ data: { ...datosAvance, tareaId, autorId: usuario.usuarioId } });
       const archivoIds: string[] = [];
+      const subidos = await this.subidas.consumir(tx, subidaIds, usuario.usuarioId, participacion.clienteId);
+
+      for (const subido of subidos) {
+        await tx.evidencia.create({ data: { avanceId: avance.id, archivoId: subido.id } });
+        archivoIds.push(subido.id);
+      }
 
       for (const { evidencia, guardado } of guardados) {
         const archivo = await tx.archivo.create({
@@ -151,7 +168,10 @@ export class AvancesTareaService {
             avanceId: avance.id,
             porcentaje: entrada.porcentaje,
             minutosDedicados: entrada.minutosDedicados,
-            evidencias: guardados.map(({ evidencia, guardado }) => ({ nombre: evidencia.nombre, sha256: guardado.sha256 })),
+            evidencias: [
+              ...guardados.map(({ evidencia, guardado }) => ({ nombre: evidencia.nombre, sha256: guardado.sha256 })),
+              ...subidos.map(({ nombre }) => ({ nombre, subida: true })),
+            ],
           },
           motivo: 'Avance registrado',
         },
