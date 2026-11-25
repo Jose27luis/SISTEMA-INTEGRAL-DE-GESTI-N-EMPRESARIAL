@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { estaAtrasada, type TareaResumen } from '@sige/types';
 import { aFechaIso, aFechaIsoONula } from '../../common/dates';
+import { evaluarSeguimiento } from './task-tracking-rules';
 
 export const INCLUSION_RESUMEN_TAREA = {
   cliente: { select: { id: true, razonSocial: true } },
@@ -9,8 +10,21 @@ export const INCLUSION_RESUMEN_TAREA = {
 
 export type TareaConResumen = Prisma.TareaGetPayload<{ include: typeof INCLUSION_RESUMEN_TAREA }>;
 
-export function aResumenTarea(tarea: TareaConResumen, hoy: string): TareaResumen {
+export function aResumenTarea(tarea: TareaConResumen, hoy: string, ahora: Date = new Date()): TareaResumen {
   const fechaLimite = aFechaIso(tarea.fechaLimite);
+  const seguimiento = evaluarSeguimiento(
+    {
+      estado: tarea.estado,
+      prioridad: tarea.prioridad,
+      fechaLimite,
+      estricto: tarea.seguimientoEstricto,
+      creadoEn: tarea.creadoEn,
+      recibidaEn: tarea.recibidaEn,
+      ultimoReporteEn: tarea.ultimoReporteEn,
+    },
+    ahora,
+    hoy,
+  );
 
   return {
     id: tarea.id,
@@ -24,5 +38,9 @@ export function aResumenTarea(tarea: TareaConResumen, hoy: string): TareaResumen
     responsable: tarea.responsable,
     porcentajeAvance: tarea.porcentajeAvance,
     atrasada: estaAtrasada(tarea.estado, fechaLimite, hoy),
+    semaforo: seguimiento.semaforo,
+    esperandoAcuse: seguimiento.esperandoAcuse,
+    sinAcuse: seguimiento.sinAcuse,
+    sinReporte: seguimiento.sinReporte,
   };
 }
