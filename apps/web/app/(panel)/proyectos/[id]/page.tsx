@@ -9,7 +9,7 @@ import { SinAcceso } from '@/components/no-access';
 import { EncabezadoPagina } from '@/components/page-header';
 import { BarraAvance, EstadoProyectoInsignia } from '@/components/project-status';
 import { solicitarApi } from '@/lib/api';
-import { fechaHoyEnLima, formatearFecha, formatearFechaHora, formatearMoneda } from '@/lib/format';
+import { fechaHoyEnLima, formatearFecha, formatearFechaHora, formatearMoneda, formatearPlazo } from '@/lib/format';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
 import {
   cambiarEstadoProyecto,
@@ -237,7 +237,8 @@ export default async function PaginaProyecto({ params, searchParams }: Propiedad
                                 {tarea.codigo} · {tarea.titulo}
                               </Link>
                               <span className={cn('text-xs', tarea.atrasada ? 'font-semibold text-rojo' : 'text-apagado')}>
-                                {tarea.responsable.nombre} · {tarea.porcentajeAvance} % · vence {formatearFecha(tarea.fechaLimite)}
+                                {tarea.responsable.nombre} · {tarea.porcentajeAvance} % · vence{' '}
+                                {formatearPlazo(tarea.fechaLimite, tarea.horaLimite)}
                               </span>
                             </li>
                           ))}
