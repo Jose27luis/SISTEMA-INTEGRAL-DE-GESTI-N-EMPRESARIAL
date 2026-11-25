@@ -53,6 +53,7 @@ export const esquemaListaItems = z
 
 const esquemaBaseTarea = z.object({
   plantillaId: z.uuid().nullable().default(null),
+  etapaId: z.uuid().nullable().default(null),
   items: esquemaListaItems.default([]),
   titulo: z.string().trim().min(3, 'Escriba un título de al menos 3 caracteres.').max(200),
   instrucciones: textoOpcional(5000),
@@ -189,6 +190,13 @@ export const esquemaTareaDetalle = esquemaTareaResumen.extend({
   creadoEn: z.iso.datetime(),
   obligacionId: z.uuid().nullable(),
   plantilla: z.object({ id: z.uuid(), nombre: z.string() }).nullable(),
+  etapa: z
+    .object({
+      id: z.uuid(),
+      nombre: z.string(),
+      proyecto: z.object({ id: z.uuid(), codigo: z.string(), nombre: z.string() }),
+    })
+    .nullable(),
   items: z.array(
     z.object({
       id: z.uuid(),
