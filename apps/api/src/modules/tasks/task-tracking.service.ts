@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ESTADOS_CERRADOS, type ProrrogaEntrada, type ResolucionProrroga } from '@sige/types';
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
-import { aFechaDb, aFechaIso, fechaHoyEnLima, formatearFechaPeruana } from '../../common/dates';
+import { aFechaDb, aFechaIso, fechaHoyEnLima, formatearPlazoPeruano, horaEnLima } from '../../common/dates';
 import { esViolacionDeUnicidad } from '../../common/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { actorDesde, AuditoriaService } from '../audit/audit.service';
@@ -87,7 +87,7 @@ export class SeguimientoTareasService {
 
     const tarea = await this.prisma.tarea.findUniqueOrThrow({
       where: { id },
-      select: { codigo: true, titulo: true, estado: true, fechaLimite: true, seguimientoEstricto: true },
+      select: { codigo: true, titulo: true, estado: true, fechaLimite: true, horaLimite: true, seguimientoEstricto: true },
     });
 
     if (!tarea.seguimientoEstricto || ESTADOS_CERRADOS.includes(tarea.estado)) {
@@ -95,11 +95,19 @@ export class SeguimientoTareasService {
     }
 
     const actual = aFechaIso(tarea.fechaLimite);
+    const propuesta = `${entrada.fechaPropuesta} ${entrada.horaPropuesta ?? '24:00'}`;
+    const vigente = `${actual} ${tarea.horaLimite ?? '24:00'}`;
+    const ahora = `${fechaHoyEnLima()} ${horaEnLima(new Date())}`;
 
-    if (entrada.fechaPropuesta <= actual || entrada.fechaPropuesta < fechaHoyEnLima()) {
+    if (propuesta <= vigente || propuesta <= ahora) {
       throw new BadRequestException({
         mensaje: 'Revise la nueva fecha.',
-        errores: [{ campo: 'fechaPropuesta', mensaje: `Debe ser posterior a la fecha límite actual (${formatearFechaPeruana(actual)}).` }],
+        errores: [
+          {
+            campo: 'fechaPropuesta',
+            mensaje: `Debe ser posterior al plazo actual (${formatearPlazoPeruano(actual, tarea.horaLimite)}) y a este momento.`,
+          },
+        ],
       });
     }
 
@@ -109,7 +117,9 @@ export class SeguimientoTareasService {
           data: {
             tareaId: id,
             fechaAnterior: tarea.fechaLimite,
+            horaAnterior: tarea.horaLimite,
             fechaPropuesta: aFechaDb(entrada.fechaPropuesta),
+            horaPropuesta: entrada.horaPropuesta,
             motivo: entrada.motivo,
             solicitadaPorId: usuario.usuarioId,
           },
@@ -121,7 +131,7 @@ export class SeguimientoTareasService {
             accion: 'CREAR',
             entidad: 'prorroga_tarea',
             entidadId: prorroga.id,
-            despues: { tareaId: id, fechaAnterior: actual, ...entrada },
+            despues: { tareaId: id, fechaAnterior: actual, horaAnterior: tarea.horaLimite, ...entrada },
           },
           tx,
         );
@@ -131,7 +141,7 @@ export class SeguimientoTareasService {
             destinatarios: [participacion.asignadoPorId],
             tipo: 'PRORROGA_SOLICITADA',
             titulo: `Prórroga solicitada: ${tarea.titulo}`,
-            mensaje: `${tarea.codigo} · Del ${formatearFechaPeruana(actual)} al ${formatearFechaPeruana(entrada.fechaPropuesta)} · ${entrada.motivo}`,
+            mensaje: `${tarea.codigo} · Del ${formatearPlazoPeruano(actual, tarea.horaLimite)} al ${formatearPlazoPeruano(entrada.fechaPropuesta, entrada.horaPropuesta)} · ${entrada.motivo}`,
             enlace: `/tareas/${id}#seguimiento`,
             entidad: 'tarea',
             entidadId: id,
@@ -200,7 +210,7 @@ export class SeguimientoTareasService {
       if (aprobada) {
         await tx.tarea.update({
           where: { id },
-          data: { fechaLimite: prorroga.fechaPropuesta, version: { increment: 1 } },
+          data: { fechaLimite: prorroga.fechaPropuesta, horaLimite: prorroga.horaPropuesta, version: { increment: 1 } },
         });
       }
 
@@ -210,8 +220,12 @@ export class SeguimientoTareasService {
           accion: 'CAMBIAR_ESTADO',
           entidad: 'prorroga_tarea',
           entidadId: prorrogaId,
-          antes: { estado: 'PENDIENTE', fechaLimite: aFechaIso(prorroga.fechaAnterior) },
-          despues: { estado: aprobada ? 'APROBADA' : 'RECHAZADA', fechaLimite: aFechaIso(aprobada ? prorroga.fechaPropuesta : prorroga.fechaAnterior) },
+          antes: { estado: 'PENDIENTE', fechaLimite: aFechaIso(prorroga.fechaAnterior), horaLimite: prorroga.horaAnterior },
+          despues: {
+            estado: aprobada ? 'APROBADA' : 'RECHAZADA',
+            fechaLimite: aFechaIso(aprobada ? prorroga.fechaPropuesta : prorroga.fechaAnterior),
+            horaLimite: aprobada ? prorroga.horaPropuesta : prorroga.horaAnterior,
+          },
           ...(entrada.respuesta === null ? {} : { motivo: entrada.respuesta }),
         },
         tx,
@@ -223,7 +237,7 @@ export class SeguimientoTareasService {
           tipo: 'PRORROGA_RESUELTA',
           titulo: `Prórroga ${aprobada ? 'aprobada' : 'rechazada'}: ${prorroga.tarea.titulo}`,
           mensaje: aprobada
-            ? `${prorroga.tarea.codigo} · Nueva fecha límite: ${formatearFechaPeruana(aFechaIso(prorroga.fechaPropuesta))}`
+            ? `${prorroga.tarea.codigo} · Nuevo plazo: ${formatearPlazoPeruano(aFechaIso(prorroga.fechaPropuesta), prorroga.horaPropuesta)}`
             : `${prorroga.tarea.codigo} · ${entrada.respuesta ?? ''}`,
           enlace: `/tareas/${id}#seguimiento`,
           entidad: 'tarea',
