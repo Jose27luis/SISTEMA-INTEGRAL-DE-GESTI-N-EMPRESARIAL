@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { esquemaReferenciaCatalogo } from './catalogs';
 import { esquemaMetadatosPagina } from './common';
 import { esquemaEstadoTarea } from './task-states';
+import { esquemaSemaforo, esquemaSeguimientoTarea } from './task-tracking';
 import { esquemaListaSubidas } from './uploads';
 
 export const PRIORIDADES = ['BAJA', 'MEDIA', 'ALTA', 'URGENTE'] as const;
@@ -122,6 +123,10 @@ export const esquemaTareaResumen = z.object({
   responsable: esquemaPersona,
   porcentajeAvance: z.number().int().min(0).max(100),
   atrasada: z.boolean(),
+  semaforo: esquemaSemaforo,
+  esperandoAcuse: z.boolean(),
+  sinAcuse: z.boolean(),
+  sinReporte: z.boolean(),
 });
 
 export const esquemaEvidencia = z.object({
@@ -216,6 +221,7 @@ export const esquemaTareaDetalle = esquemaTareaResumen.extend({
   completadaEn: z.iso.datetime().nullable(),
   rondas: z.array(esquemaRondaRevision),
   evidenciasAdjuntas: z.number().int().nonnegative(),
+  seguimiento: esquemaSeguimientoTarea,
   acciones: z.object({
     editar: z.boolean(),
     iniciar: z.boolean(),
