@@ -24,6 +24,22 @@ describe('evaluarSeguimiento', () => {
     expect(evaluarSeguimiento({ ...base, prioridad: 'BAJA' }, new Date(), '2026-12-01')).toMatchObject({ limiteReporte: '2026-12-04', sinReporte: false });
   });
 
+  it('con hora límite, vence ese mismo día al pasar la hora de Lima', () => {
+    const datos = {
+      estado: 'EN_PROCESO' as const,
+      prioridad: 'MEDIA' as const,
+      fechaLimite: '2026-11-25',
+      horaLimite: '12:00',
+      estricto: false,
+      creadoEn: creada,
+      recibidaEn: null,
+      ultimoReporteEn: null,
+    };
+    expect(evaluarSeguimiento(datos, new Date('2026-11-25T16:59:00Z'), '2026-11-25').semaforo).toBe('POR_VENCER');
+    expect(evaluarSeguimiento(datos, new Date('2026-11-25T17:01:00Z'), '2026-11-25').semaforo).toBe('VENCIDA');
+    expect(evaluarSeguimiento({ ...datos, horaLimite: null }, new Date('2026-11-25T23:00:00Z'), '2026-11-25').semaforo).toBe('POR_VENCER');
+  });
+
   it('no aplica reglas estrictas a tareas anteriores ni cerradas', () => {
     const datos = { estado: 'PENDIENTE' as const, prioridad: 'URGENTE' as const, fechaLimite: '2026-11-20', estricto: false, creadoEn: creada, recibidaEn: null, ultimoReporteEn: null };
     expect(evaluarSeguimiento(datos, new Date('2026-12-01T00:00:00Z'), '2026-12-01')).toMatchObject({ esperandoAcuse: false, sinAcuse: false, sinReporte: false, semaforo: 'VENCIDA' });
