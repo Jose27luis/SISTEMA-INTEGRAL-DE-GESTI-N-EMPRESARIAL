@@ -15,6 +15,7 @@ const INCLUSION_EGRESO = {
   responsable: { select: { id: true, nombre: true } },
   medioPago: { select: { nombre: true } },
   cliente: { select: { id: true, razonSocial: true } },
+  proyecto: { select: { id: true, codigo: true, nombre: true } },
   creadoPor: { select: { nombre: true } },
 } satisfies Prisma.EgresoInclude;
 
@@ -84,6 +85,7 @@ export class EgresosService {
         responsable: egreso.responsable,
         medioPago: egreso.medioPago.nombre,
         cliente: egreso.cliente,
+        proyecto: egreso.proyecto,
         observaciones: egreso.observaciones,
         registradoPor: egreso.creadoPor.nombre,
         registradoEn: aIso(egreso.creadoEn),
@@ -136,11 +138,30 @@ export class EgresosService {
       throw errorCampo('clienteId', 'El cliente no existe.');
     }
 
+    let clienteId = entrada.clienteId;
+
+    if (entrada.proyectoId !== null) {
+      const proyecto = await this.prisma.proyecto.findUnique({
+        where: { id: entrada.proyectoId },
+        select: { estado: true, clienteId: true },
+      });
+
+      if (proyecto === null || proyecto.estado === 'CANCELADO') {
+        throw errorCampo('proyectoId', 'Seleccione un proyecto vigente.');
+      }
+
+      if (clienteId !== null && proyecto.clienteId !== null && clienteId !== proyecto.clienteId) {
+        throw errorCampo('clienteId', 'El cliente no coincide con el del proyecto.');
+      }
+
+      clienteId = clienteId ?? proyecto.clienteId;
+    }
+
     const comprobante = await guardarAdjuntoFinanciero(this.almacen, adjuntos, 'egresos', 'comprobante');
 
     return this.prisma.$transaction(async (tx) => {
       const comprobanteId =
-        comprobante === null ? null : await registrarAdjunto(tx, comprobante, entrada.clienteId, usuario.usuarioId);
+        comprobante === null ? null : await registrarAdjunto(tx, comprobante, clienteId, usuario.usuarioId);
       const egreso = await tx.egreso.create({
         data: {
           concepto: entrada.concepto,
@@ -153,7 +174,8 @@ export class EgresosService {
           comprobanteId,
           responsableId: entrada.responsableId,
           medioPagoId: entrada.medioPagoId,
-          clienteId: entrada.clienteId,
+          clienteId,
+          proyectoId: entrada.proyectoId,
           observaciones: entrada.observaciones,
           creadoPorId: usuario.usuarioId,
         },
