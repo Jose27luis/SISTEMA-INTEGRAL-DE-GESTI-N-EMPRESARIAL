@@ -488,7 +488,9 @@ model Tarea {
   prioridad          Prioridad   @default(MEDIA)
   estado             EstadoTarea @default(PENDIENTE)
   fechaInicio        DateTime?   @map("fecha_inicio") @db.Date
+  horaInicio         String?     @map("hora_inicio") @db.VarChar(5)
   fechaLimite        DateTime    @map("fecha_limite") @db.Date
+  horaLimite         String?     @map("hora_limite") @db.VarChar(5)
   requiereAprobacion Boolean     @default(true) @map("requiere_aprobacion")
   requiereEvidencia  Boolean     @default(false) @map("requiere_evidencia")
   evidenciaRequerida String?     @map("evidencia_requerida")
@@ -1438,7 +1440,9 @@ model ProrrogaTarea {
   id              String         @id @default(uuid()) @db.Uuid
   tareaId         String         @map("tarea_id") @db.Uuid
   fechaAnterior   DateTime       @map("fecha_anterior") @db.Date
+  horaAnterior    String?        @map("hora_anterior") @db.VarChar(5)
   fechaPropuesta  DateTime       @map("fecha_propuesta") @db.Date
+  horaPropuesta   String?        @map("hora_propuesta") @db.VarChar(5)
   motivo          String
   estado          EstadoProrroga @default(PENDIENTE)
   solicitadaPorId String         @map("solicitada_por_id") @db.Uuid
