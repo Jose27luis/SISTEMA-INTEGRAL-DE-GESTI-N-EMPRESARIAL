@@ -11,6 +11,7 @@ const esquemaEntorno = z.object({
   SESION_DURACION_HORAS: z.coerce.number().int().min(1).max(24).default(8),
   SESION_INACTIVIDAD_MINUTOS: z.coerce.number().int().min(5).max(240).default(30),
   DIRECTORIO_ARCHIVOS: z.string().min(1).default('/app/almacen'),
+  CONVERSOR_URL: z.url().default('http://conversor:3000'),
 });
 
 export type Entorno = z.infer<typeof esquemaEntorno>;
