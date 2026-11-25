@@ -130,13 +130,16 @@ function validarReglasComunes(
   }
 }
 
-export const esquemaTareaEntrada = esquemaBaseTarea.superRefine(validarReglasTarea);
+export const esquemaTareaEntrada = esquemaBaseTarea
+  .extend({ subidaIds: esquemaListaSubidas })
+  .superRefine(validarReglasTarea);
 
 export const MAXIMO_RESPONSABLES_LOTE = 20;
 
 export const esquemaAsignacionMasiva = esquemaBaseTarea
   .omit({ responsableId: true })
   .extend({
+    subidaIds: esquemaListaSubidas,
     responsableIds: z
       .array(z.uuid())
       .min(2, 'Elija al menos dos responsables para asignar a varias personas.')
@@ -266,6 +269,16 @@ export const esquemaTareaDetalle = esquemaTareaResumen.extend({
   creadoEn: z.iso.datetime(),
   obligacionId: z.uuid().nullable(),
   plantilla: z.object({ id: z.uuid(), nombre: z.string() }).nullable(),
+  adjuntos: z.array(
+    z.object({
+      id: z.uuid(),
+      nombre: z.string(),
+      mime: z.string(),
+      tamanoBytes: z.number().int().nonnegative(),
+      agregadoPor: z.string(),
+      agregadoEn: z.iso.datetime(),
+    }),
+  ),
   etapa: z
     .object({
       id: z.uuid(),
