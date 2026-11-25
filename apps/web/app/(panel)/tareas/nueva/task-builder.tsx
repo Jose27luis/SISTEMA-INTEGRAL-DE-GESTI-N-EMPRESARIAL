@@ -3,6 +3,7 @@
 import {
   type CargaEquipo,
   ETIQUETAS_PRIORIDAD,
+  MAXIMO_ARCHIVOS_POR_ENVIO,
   MAXIMO_RESPONSABLES_LOTE,
   PRIORIDADES,
   type Prioridad,
@@ -11,6 +12,7 @@ import { cn } from '@sige/ui/cn';
 import { Alerta, AreaTexto, Campo, CampoFecha, CampoHora, Casilla, Seleccion } from '@sige/ui/components';
 import { type ReactNode, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
+import { CargadorArchivos } from '@/components/file-uploader';
 import { MensajeFormulario } from '@/components/form-message';
 import { BotonEnvio } from '@/components/submit-button';
 import { ESTADO_INICIAL, type EstadoFormulario } from '@/lib/form-state';
@@ -343,6 +345,13 @@ export function ConstructorTarea({
                 cambiar('items', items);
               }}
               error={estado.errores.items}
+            />
+            <CargadorArchivos
+              nombre="subidaIds"
+              etiqueta="Archivos para el responsable"
+              ayuda="Word, Excel, PDF, imágenes y comprimidos, hasta 200 MB cada uno. Con varias personas, todas reciben los mismos archivos. No se guardan en el borrador."
+              maximo={MAXIMO_ARCHIVOS_POR_ENVIO}
+              error={estado.errores.subidaIds}
             />
           </div>
         </Seccion>
