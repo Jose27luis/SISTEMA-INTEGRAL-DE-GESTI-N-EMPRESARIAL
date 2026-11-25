@@ -1,17 +1,17 @@
 import { ETIQUETAS_ESTADO_TAREA, esquemaTareaDetalle } from '@sige/types';
 import { Alerta, Insignia, Tarjeta } from '@sige/ui/components';
-import { Download, Eye, FileText } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { z } from 'zod';
 import { FormularioConfirmacion } from '@/components/confirm-action-form';
+import { ArchivoAdjunto } from '@/components/file-viewer';
 import { SinAcceso } from '@/components/no-access';
 import { EncabezadoPagina } from '@/components/page-header';
 import { BarraAvance, EstadoTareaInsignia, PrioridadInsignia } from '@/components/task-badges';
 import { solicitarApi } from '@/lib/api';
-import { formatearFecha, formatearFechaHora, formatearMinutos, formatearTamano } from '@/lib/format';
+import { formatearFecha, formatearFechaHora, formatearMinutos } from '@/lib/format';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
 import {
   agregarItem,
@@ -31,8 +31,6 @@ import { FormularioEnvio, FormularioRevision } from './review-forms';
 import { BotonIniciar } from './start-button';
 
 export const metadata: Metadata = { title: 'Tarea · TORRES ASOCIADOS' };
-
-const TIPOS_CON_VISTA = new Set(['application/pdf', 'image/png', 'image/jpeg', 'image/webp']);
 
 interface PropiedadesPaginaTarea {
   params: Promise<{ id: string }>;
@@ -249,33 +247,10 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
                       )}
                     </dl>
                     {avance.evidencias.length === 0 ? null : (
-                      <ul className="mt-3 flex flex-col gap-2">
+                      <ul className="mt-3 grid gap-2 @container sm:grid-cols-2">
                         {avance.evidencias.map((evidencia) => (
-                          <li
-                            key={evidencia.id}
-                            className="flex items-center gap-3 rounded-md border border-borde px-3 py-2 text-sm"
-                          >
-                            <FileText aria-hidden="true" className="size-4 shrink-0 text-apagado" />
-                            <span className="min-w-0 flex-1 truncate text-tinta">{evidencia.nombre}</span>
-                            <span className="shrink-0 text-xs text-apagado">{formatearTamano(evidencia.tamanoBytes)}</span>
-                            {TIPOS_CON_VISTA.has(evidencia.mime) ? (
-                              <a
-                                href={`/archivos/${evidencia.id}`}
-                                target="_blank"
-                                rel="noopener"
-                                aria-label={`Ver ${evidencia.nombre}`}
-                                className="inline-flex size-9 items-center justify-center rounded-md text-marino-claro hover:bg-marino/5"
-                              >
-                                <Eye aria-hidden="true" className="size-4" />
-                              </a>
-                            ) : null}
-                            <a
-                              href={`/archivos/${evidencia.id}?descarga=1`}
-                              aria-label={`Descargar ${evidencia.nombre}`}
-                              className="inline-flex size-9 items-center justify-center rounded-md text-marino-claro hover:bg-marino/5"
-                            >
-                              <Download aria-hidden="true" className="size-4" />
-                            </a>
+                          <li key={evidencia.id} className="min-w-0">
+                            <ArchivoAdjunto id={evidencia.id} nombre={evidencia.nombre} tamanoBytes={evidencia.tamanoBytes} />
                           </li>
                         ))}
                       </ul>
