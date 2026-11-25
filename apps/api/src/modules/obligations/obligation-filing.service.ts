@@ -98,6 +98,7 @@ export class PresentacionObligacionesService {
         observaciones: entrada.observaciones,
         proximoPaso: null,
         corrigeAId: null,
+        subidaIds: [],
       },
       [constancia],
       usuario,
