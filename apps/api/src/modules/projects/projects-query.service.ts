@@ -14,7 +14,7 @@ import {
   TRANSICIONES_PROYECTO,
 } from '@sige/types';
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
-import { aFechaDb, aFechaIso, aFechaIsoONula, aIso, aIsoONulo, fechaHoyEnLima } from '../../common/dates';
+import { aFechaDb, aFechaIso, aFechaIsoONula, aIso, aIsoONulo, fechaHoyEnLima, horaEnLima } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { actorDesde, AuditoriaService } from '../audit/audit.service';
 import { AccesoClientesService } from '../clients/client-access.service';
@@ -179,7 +179,7 @@ export class ConsultaProyectosService {
             orderBy: { orden: 'asc' },
             include: {
               tareas: {
-                orderBy: [{ fechaLimite: 'asc' }, { codigo: 'asc' }],
+                orderBy: [{ fechaLimite: 'asc' }, { horaLimite: { sort: 'asc', nulls: 'last' } }, { codigo: 'asc' }],
                 select: {
                   id: true,
                   codigo: true,
@@ -187,6 +187,7 @@ export class ConsultaProyectosService {
                   estado: true,
                   fechaInicio: true,
                   fechaLimite: true,
+                  horaLimite: true,
                   porcentajeAvance: true,
                   responsable: { select: { id: true, nombre: true } },
                 },
@@ -257,8 +258,9 @@ export class ConsultaProyectosService {
             responsable: tarea.responsable,
             fechaInicio: aFechaIsoONula(tarea.fechaInicio),
             fechaLimite,
+            horaLimite: tarea.horaLimite,
             porcentajeAvance: tarea.porcentajeAvance,
-            atrasada: estaAtrasada(tarea.estado, fechaLimite, hoy),
+            atrasada: estaAtrasada(tarea.estado, fechaLimite, hoy, tarea.horaLimite, horaEnLima(new Date())),
             etapaId: etapa.id,
           };
         }),
