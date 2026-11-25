@@ -12,7 +12,7 @@ import { SinAcceso } from '@/components/no-access';
 import { EncabezadoPagina } from '@/components/page-header';
 import { BarraAvance, EstadoTareaInsignia, PrioridadInsignia } from '@/components/task-badges';
 import { solicitarApi } from '@/lib/api';
-import { formatearFecha, formatearFechaHora, formatearMinutos } from '@/lib/format';
+import { formatearFecha, formatearFechaHora, formatearMinutos, formatearPlazo } from '@/lib/format';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
 import {
   acusarTarea,
@@ -108,7 +108,12 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
 
       <section id="seguimiento" className="mb-6 scroll-mt-6">
         <Tarjeta titulo="Seguimiento">
-          <BarraSeguimiento seguimiento={seguimiento} prioridad={tarea.prioridad} fechaLimite={tarea.fechaLimite} />
+          <BarraSeguimiento
+            seguimiento={seguimiento}
+            prioridad={tarea.prioridad}
+            fechaLimite={tarea.fechaLimite}
+            horaLimite={tarea.horaLimite}
+          />
         </Tarjeta>
       </section>
 
@@ -155,7 +160,7 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
           )}
           {tarea.atrasada ? (
             <Alerta tono="error" titulo="Tarea atrasada">
-              Venció el {formatearFecha(tarea.fechaLimite)}.{' '}
+              Venció el {formatearPlazo(tarea.fechaLimite, tarea.horaLimite)}.{' '}
               {seguimiento.estricto
                 ? 'Registre un avance o pida una prórroga a quien la asignó.'
                 : 'Registre un avance o coordine una nueva fecha con quien la asignó.'}
@@ -387,9 +392,11 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
                 )}
               </dd>
               <dt className="text-apagado">Inicio</dt>
-              <dd>{tarea.fechaInicio === null ? 'Sin definir' : formatearFecha(tarea.fechaInicio)}</dd>
+              <dd>{tarea.fechaInicio === null ? 'Sin definir' : formatearPlazo(tarea.fechaInicio, tarea.horaInicio)}</dd>
               <dt className="text-apagado">Fecha límite</dt>
-              <dd className={tarea.atrasada ? 'font-semibold text-rojo' : undefined}>{formatearFecha(tarea.fechaLimite)}</dd>
+              <dd className={tarea.atrasada ? 'font-semibold text-rojo' : undefined}>
+                {formatearPlazo(tarea.fechaLimite, tarea.horaLimite)}
+              </dd>
               <dt className="text-apagado">Tiempo registrado</dt>
               <dd>{formatearMinutos(tarea.minutosRegistrados)}</dd>
               <dt className="text-apagado">Creada</dt>
@@ -403,8 +410,8 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
                 {prorrogaPendiente === null ? null : (
                   <div className="rounded-md border border-dorado bg-dorado-suave px-4 py-3 text-sm">
                     <p className="font-semibold text-dorado-oscuro">
-                      Prórroga pendiente: {formatearFecha(prorrogaPendiente.fechaAnterior)} →{' '}
-                      {formatearFecha(prorrogaPendiente.fechaPropuesta)}
+                      Prórroga pendiente: {formatearPlazo(prorrogaPendiente.fechaAnterior, prorrogaPendiente.horaAnterior)} →{' '}
+                      {formatearPlazo(prorrogaPendiente.fechaPropuesta, prorrogaPendiente.horaPropuesta)}
                     </p>
                     <p className="mt-1 whitespace-pre-line text-tinta">{prorrogaPendiente.motivo}</p>
                     <p className="mt-1 text-xs text-apagado">
@@ -416,7 +423,11 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
                   <FormularioResolucionProrroga accion={resolverProrroga.bind(null, tarea.id, prorrogaPendiente.id)} />
                 ) : null}
                 {seguimiento.acciones.solicitarProrroga ? (
-                  <FormularioProrroga accion={solicitarProrroga.bind(null, tarea.id)} fechaLimite={tarea.fechaLimite} />
+                  <FormularioProrroga
+                    accion={solicitarProrroga.bind(null, tarea.id)}
+                    fechaLimite={tarea.fechaLimite}
+                    horaLimite={tarea.horaLimite}
+                  />
                 ) : null}
                 {seguimiento.prorrogas.some(({ estado }) => estado !== 'PENDIENTE') ? (
                   <ol className="flex flex-col gap-3 border-t border-borde pt-4 text-sm">
@@ -429,7 +440,8 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
                               {prorroga.estado === 'APROBADA' ? 'Aprobada' : 'Rechazada'}
                             </Insignia>
                             <span className="text-tinta">
-                              {formatearFecha(prorroga.fechaAnterior)} → {formatearFecha(prorroga.fechaPropuesta)}
+                              {formatearPlazo(prorroga.fechaAnterior, prorroga.horaAnterior)} →{' '}
+                              {formatearPlazo(prorroga.fechaPropuesta, prorroga.horaPropuesta)}
                             </span>
                           </span>
                           <span className="text-apagado">{prorroga.motivo}</span>
