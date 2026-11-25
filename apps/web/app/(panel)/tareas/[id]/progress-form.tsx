@@ -1,16 +1,12 @@
 'use client';
 
-import { MAXIMO_EVIDENCIAS_POR_AVANCE, TAMANO_MAXIMO_EVIDENCIA_MB } from '@sige/types';
+import { MAXIMO_EVIDENCIAS_POR_AVANCE } from '@sige/types';
 import { AreaTexto, Campo, Seleccion } from '@sige/ui/components';
-import { Paperclip } from 'lucide-react';
-import { type ReactNode, useActionState, useState } from 'react';
+import { type ReactNode, useActionState, useEffect, useState } from 'react';
+import { CargadorArchivos } from '@/components/file-uploader';
 import { MensajeFormulario } from '@/components/form-message';
 import { BotonEnvio } from '@/components/submit-button';
 import { ESTADO_INICIAL, type EstadoFormulario } from '@/lib/form-state';
-import { formatearTamano } from '@/lib/format';
-
-const FORMATOS_ACEPTADOS = '.pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx';
-const LIMITE_BYTES = TAMANO_MAXIMO_EVIDENCIA_MB * 1024 * 1024;
 
 interface AvanceCorregible {
   id: string;
@@ -31,18 +27,16 @@ export function FormularioAvance({
   corregibles,
 }: PropiedadesFormularioAvance): ReactNode {
   const [estado, accionFormulario] = useActionState(accion, ESTADO_INICIAL);
-  const [archivos, setArchivos] = useState<{ nombre: string; tamano: number }[]>([]);
-  const total = archivos.reduce((suma, archivo) => suma + archivo.tamano, 0);
-  const excede = archivos.length > MAXIMO_EVIDENCIAS_POR_AVANCE || total > LIMITE_BYTES;
+  const [registrados, setRegistrados] = useState(0);
+
+  useEffect(() => {
+    if (estado.exito) {
+      setRegistrados((cantidad) => cantidad + 1);
+    }
+  }, [estado]);
 
   return (
-    <form
-      action={(datos) => {
-        setArchivos([]);
-        accionFormulario(datos);
-      }}
-      className="flex flex-col gap-4"
-    >
+    <form action={accionFormulario} key={registrados} className="flex flex-col gap-4">
       <MensajeFormulario estado={estado} />
       <Campo
         id="actividad"
@@ -141,49 +135,15 @@ export function FormularioAvance({
         </div>
       </details>
       <div className="flex flex-col gap-2">
-        <label htmlFor="evidencias" className="text-sm font-medium text-tinta">
-          Evidencias
-        </label>
         {evidenciaRequerida === null ? null : (
-          <p className="text-sm text-dorado-oscuro">Se espera: {evidenciaRequerida}</p>
+          <p className="rounded-md bg-dorado-suave px-3 py-2 text-sm text-dorado-oscuro">Se espera: {evidenciaRequerida}</p>
         )}
-        <input
-          id="evidencias"
-          name="evidencias"
-          type="file"
-          multiple
-          accept={FORMATOS_ACEPTADOS}
-          aria-describedby="evidencias-ayuda"
-          onChange={(evento) => {
-            setArchivos(
-              Array.from(evento.target.files ?? []).map((archivo) => ({ nombre: archivo.name, tamano: archivo.size })),
-            );
-          }}
-          className="block w-full text-sm text-apagado file:mr-3 file:min-h-11 file:rounded-md file:border-0 file:bg-marino/10 file:px-4 file:font-semibold file:text-marino hover:file:bg-marino/15"
+        <CargadorArchivos
+          nombre="subidaIds"
+          etiqueta="Evidencias"
+          maximo={MAXIMO_EVIDENCIAS_POR_AVANCE}
+          error={estado.errores.subidaIds ?? estado.errores.evidencias}
         />
-        <p id="evidencias-ayuda" className="text-xs text-apagado">
-          PDF, imágenes, Word, Excel o PowerPoint. Hasta {MAXIMO_EVIDENCIAS_POR_AVANCE} archivos y{' '}
-          {TAMANO_MAXIMO_EVIDENCIA_MB} MB en total.
-        </p>
-        {archivos.length === 0 ? null : (
-          <ul className="flex flex-col gap-1 text-sm">
-            {archivos.map((archivo) => (
-              <li key={archivo.nombre} className="flex items-center gap-2 text-tinta">
-                <Paperclip aria-hidden="true" className="size-4 text-apagado" />
-                <span className="truncate">{archivo.nombre}</span>
-                <span className="shrink-0 text-xs text-apagado">{formatearTamano(archivo.tamano)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {excede ? (
-          <p className="text-sm font-medium text-rojo">
-            Supera el límite de {MAXIMO_EVIDENCIAS_POR_AVANCE} archivos o {TAMANO_MAXIMO_EVIDENCIA_MB} MB en total.
-          </p>
-        ) : null}
-        {estado.errores.evidencias === undefined ? null : (
-          <p className="text-sm font-medium text-rojo">{estado.errores.evidencias}</p>
-        )}
       </div>
       <BotonEnvio textoPendiente="Registrando…" className="self-start">
         Registrar avance
