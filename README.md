@@ -4102,6 +4102,20 @@ Pedido de Gerencia: poder indicar la hora, además del día, en el inicio y la f
 
 **Verificación por la API** en el entorno de prueba: una hora no válida, una hora de inicio sin fecha y una hora límite anterior a la de inicio el mismo día se rechazaron con 400. Una tarea que vencía a las 12:00 apareció vencida y atrasada a las 12:27 (en el filtro y en «Mi trabajo»), mientras que las de las 23:00 y sin hora siguieron «Por vencer». Cambiar la hora de una tarea estricta se rechazó; la prórroga a una hora anterior se rechazó, la de 23:00 a 23:30 del mismo día se aceptó y su aprobación actualizó la hora. Los avisos muestran la hora. Las páginas se generaron sin errores. La interfaz la revisa el usuario.
 
+### 12.21 Archivos al asignar una tarea
+
+Pedido de Gerencia: adjuntar archivos desde «Nueva tarea» (antes solo se podía como evidencia de un avance).
+
+- **Constructor:** en el paso 1, «Archivos para el responsable», con el mismo cargador de la parte A: subida por partes, reanudable, hasta 200 MB por archivo y hasta 10 archivos. El botón de asignar queda bloqueado mientras suben. Los archivos no se guardan en el borrador del navegador.
+- **Asignación masiva:** el archivo se guarda una sola vez y queda enlazado a cada tarea del lote; cada responsable lo ve en la suya.
+- **Detalle:** tarjeta «Archivos de la tarea» debajo de las instrucciones, con el visor (PDF, Excel en tabla, Word y PowerPoint convertidos, imágenes) y la descarga.
+- **Acceso:** puede abrir el archivo quien puede ver al menos una de las tareas a las que está enlazado. A los demás se les responde 403 y queda en la auditoría.
+- **Datos:** migración `20261204120000_adjuntos_de_tarea` con la tabla `adjuntos_tarea` (tarea, archivo, quién lo adjuntó y cuándo; un archivo no se repite en la misma tarea).
+
+**Pendiente:** la edición y el duplicado no agregan ni copian archivos; los adjuntos se suben al crear la tarea.
+
+**Verificación por la API** en el entorno de prueba: una tarea creada con un CSV lo mostró en su detalle; la responsable lo descargó (200) y dos personas ajenas recibieron 403. Reusar una subida ya usada se rechazó. Un lote de 2 responsables compartió el mismo archivo: ambas lo abrieron (incluida la vista de la hoja) y una tercera persona recibió 403. El constructor y el detalle se generaron sin errores. La interfaz la revisa el usuario.
+
 ---
 
 ## Licencia y titularidad
