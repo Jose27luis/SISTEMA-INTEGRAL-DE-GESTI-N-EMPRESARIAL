@@ -17,7 +17,7 @@ import {
   type TareaResumen,
 } from '@sige/types';
 import type { UsuarioAutenticado } from '../../common/auth/authenticated-request';
-import { aFechaDb, aFechaIso, aIso, aIsoONulo, fechaHoyEnLima } from '../../common/dates';
+import { aFechaDb, aFechaIso, aIso, aIsoONulo, fechaHoyEnLima, horaEnLima } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccesoTareasService } from './task-access.service';
 import { aResumenTarea, INCLUSION_RESUMEN_TAREA } from './task-mappers';
@@ -88,7 +88,13 @@ export class ConsultaTareasService {
     }
 
     if (filtro.atrasadas !== undefined) {
-      condiciones.push({ fechaLimite: { lt: aFechaDb(hoy) }, estado: { notIn: [...ESTADOS_CERRADOS] } });
+      condiciones.push({
+        estado: { notIn: [...ESTADOS_CERRADOS] },
+        OR: [
+          { fechaLimite: { lt: aFechaDb(hoy) } },
+          { fechaLimite: aFechaDb(hoy), horaLimite: { lt: horaEnLima(new Date()) } },
+        ],
+      });
     }
 
     if (filtro.desde !== undefined) {
@@ -105,7 +111,12 @@ export class ConsultaTareasService {
       this.prisma.tarea.count({ where: donde }),
       this.prisma.tarea.findMany({
         where: donde,
-        orderBy: [{ fechaLimite: 'asc' }, { prioridad: 'desc' }, { codigo: 'asc' }],
+        orderBy: [
+          { fechaLimite: 'asc' },
+          { horaLimite: { sort: 'asc', nulls: 'last' } },
+          { prioridad: 'desc' },
+          { codigo: 'asc' },
+        ],
         skip: (filtro.pagina - 1) * filtro.porPagina,
         take: filtro.porPagina,
         include: INCLUSION_RESUMEN_TAREA,
@@ -214,7 +225,7 @@ export class ConsultaTareasService {
             { colaboradores: { some: { usuarioId: usuario.usuarioId, retiradoEn: null } } },
           ],
         },
-        orderBy: [{ fechaLimite: 'asc' }, { prioridad: 'desc' }],
+        orderBy: [{ fechaLimite: 'asc' }, { horaLimite: { sort: 'asc', nulls: 'last' } }, { prioridad: 'desc' }],
         include: INCLUSION_RESUMEN_TAREA,
       }),
       this.prisma.tarea.count({ where: { revisorId: usuario.usuarioId, estado: 'EN_REVISION' } }),
@@ -224,8 +235,8 @@ export class ConsultaTareasService {
     const grupo = (condicion: (tarea: TareaResumen) => boolean): TareaResumen[] => resumen.filter(condicion);
 
     return {
-      atrasadas: grupo((tarea) => tarea.fechaLimite < hoy),
-      hoy: grupo((tarea) => tarea.fechaLimite === hoy),
+      atrasadas: grupo((tarea) => tarea.atrasada),
+      hoy: grupo((tarea) => tarea.fechaLimite === hoy && !tarea.atrasada),
       proximas: grupo((tarea) => tarea.fechaLimite > hoy && tarea.fechaLimite <= limiteProximas),
       posteriores: grupo((tarea) => tarea.fechaLimite > limiteProximas),
       porRevisar,
@@ -296,6 +307,7 @@ export class ConsultaTareasService {
         estado: tarea.estado,
         prioridad: tarea.prioridad,
         fechaLimite: aFechaIso(tarea.fechaLimite),
+        horaLimite: tarea.horaLimite,
         estricto: tarea.seguimientoEstricto,
         creadoEn: tarea.creadoEn,
         recibidaEn: tarea.recibidaEn,
@@ -407,7 +419,9 @@ export class ConsultaTareasService {
         prorrogas: tarea.prorrogas.map((prorroga) => ({
           id: prorroga.id,
           fechaAnterior: aFechaIso(prorroga.fechaAnterior),
+          horaAnterior: prorroga.horaAnterior,
           fechaPropuesta: aFechaIso(prorroga.fechaPropuesta),
+          horaPropuesta: prorroga.horaPropuesta,
           motivo: prorroga.motivo,
           estado: prorroga.estado,
           solicitadaPor: prorroga.solicitadaPor.nombre,
