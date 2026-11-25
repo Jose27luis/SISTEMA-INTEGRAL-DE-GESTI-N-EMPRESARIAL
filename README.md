@@ -4055,6 +4055,31 @@ Aplica a toda tarea creada desde esta versión (`tareas.seguimiento_estricto = t
 - Enviar a revisión al 0 % y con la lista incompleta respondió 400 con ambos requisitos.
 - Una tarea simulada con 30 horas sin acuse y vencida generó los avisos de sin acuse (2) y de escalamiento (1); una segunda corrida no los repitió.
 
+### 12.19 Tareas a medida, parte C: creación interactiva
+
+`/tareas/nueva` es ahora un constructor en cuatro pasos con una vista previa al costado. La edición de tareas conserva su formulario.
+
+| Paso | Qué ofrece |
+|---|---|
+| 1. Qué hay que hacer | Título, instrucciones, cliente, prioridad con botones de color y lista de verificación ordenable (arrastrar o flechas, Enter agrega, hasta 30 pasos). |
+| 2. Quién lo hace | Tarjetas del equipo con su carga: tareas abiertas, vencidas, por vencer (2 días o menos), urgentes y sin confirmar, con una barra y una etiqueta (Libre, Disponible, Carga alta desde 8 abiertas, Con atrasos). Buscador cuando hay más de 6 personas. Modo «Varias personas» para la asignación masiva. Colaboradores como botones. |
+| 3. Para cuándo | Inicio, fecha límite, plazos rápidos en días hábiles (siguiente día hábil, 3 días, 1 semana, 2 semanas, fin de mes) y un calendario con los vencimientos del responsable elegido en los próximos 120 días; un toque en el día fija la fecha límite. |
+| 4. Control de calidad | Aprobación con revisor y evidencia requerida. |
+
+**Vista previa:** muestra la tarea como la verá el responsable, con el plazo en días hábiles, la frecuencia de reporte según la prioridad y lo que falta completar (con enlace a cada campo). El botón de asignar se habilita solo cuando no falta nada.
+
+**Asignación masiva:** con «Varias personas» se crea una tarea independiente por cada responsable (de 2 a 20), con el mismo contenido, en una sola transacción: si una falla, no se crea ninguna. Quien es responsable no queda además como colaborador, y el revisor no puede ser uno de los responsables. Al terminar, la lista de tareas muestra cuántas se asignaron.
+
+**Duplicar:** el botón «Duplicar» del detalle (para quien puede crear tareas) abre el constructor con el contenido, las personas y la lista de verificación de la original, y una fecha límite con el mismo plazo contado desde hoy.
+
+**Borrador automático:** el constructor guarda lo escrito en el navegador de cada usuario medio segundo después de cada cambio. Al volver a «Nueva tarea» ofrece recuperarlo o descartarlo. Se borra al enviar. No se guarda en el servidor: otro navegador no lo ve.
+
+**API:**
+- `GET /tareas/carga` (permiso `tarea:crear`): carga de cada usuario activo y sus vencimientos por día.
+- `POST /tareas/lote` (permiso `tarea:crear`): asignación masiva; devuelve el código y el responsable de cada tarea creada.
+
+**Verificación por la API** en el entorno de prueba: revisor entre los responsables, un solo responsable y responsables repetidos se rechazaron con 400; un lote de 3 creó 3 tareas estrictas con su lista de verificación y sin el responsable repetido como colaborador; la carga reflejó las tareas y sus vencimientos, y respondió 403 a un usuario sin permiso de crear. Las páginas de nueva tarea, duplicado, lista y detalle se generaron sin errores. La interfaz la revisa el usuario.
+
 ---
 
 ## Licencia y titularidad
