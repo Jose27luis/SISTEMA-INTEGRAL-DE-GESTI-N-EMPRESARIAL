@@ -1,7 +1,7 @@
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { ESTADOS_CERRADOS, HORAS_PARA_ACUSE } from '@sige/types';
-import { aFechaIso, fechaHoyEnLima, formatearFechaPeruana } from '../../common/dates';
+import { aFechaIso, fechaHoyEnLima, formatearFechaPeruana, formatearPlazoPeruano } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificacionesService } from '../notifications/notifications.service';
 import { evaluarSeguimiento } from '../tasks/task-tracking-rules';
@@ -23,7 +23,7 @@ export class SeguimientoTareasJob implements OnApplicationBootstrap {
     void this.ejecutar();
   }
 
-  @Cron('0 20 * * * *', { name: PROCESO, timeZone: 'America/Lima' })
+  @Cron('0 5,20,35,50 * * * *', { name: PROCESO, timeZone: 'America/Lima' })
   async ejecutar(): Promise<void> {
     const ejecucion = await this.prisma.ejecucionProceso.create({ data: { proceso: PROCESO } });
 
@@ -47,6 +47,7 @@ export class SeguimientoTareasJob implements OnApplicationBootstrap {
               estado: true,
               prioridad: true,
               fechaLimite: true,
+              horaLimite: true,
               creadoEn: true,
               recibidaEn: true,
               ultimoReporteEn: true,
@@ -71,6 +72,7 @@ export class SeguimientoTareasJob implements OnApplicationBootstrap {
                 estado: tarea.estado,
                 prioridad: tarea.prioridad,
                 fechaLimite,
+                horaLimite: tarea.horaLimite,
                 estricto: true,
                 creadoEn: tarea.creadoEn,
                 recibidaEn: tarea.recibidaEn,
@@ -130,8 +132,8 @@ export class SeguimientoTareasJob implements OnApplicationBootstrap {
                 gerencia.map(({ id }) => id),
                 'TAREA_ESCALADA',
                 `Tarea vencida: ${tarea.titulo}`,
-                `${tarea.codigo} · Responsable ${tarea.responsable.nombre} · venció el ${formatearFechaPeruana(fechaLimite)}.`,
-                fechaLimite,
+                `${tarea.codigo} · Responsable ${tarea.responsable.nombre} · venció el ${formatearPlazoPeruano(fechaLimite, tarea.horaLimite)}.`,
+                `${fechaLimite}${tarea.horaLimite === null ? '' : `T${tarea.horaLimite}`}`,
               );
             }
           }
