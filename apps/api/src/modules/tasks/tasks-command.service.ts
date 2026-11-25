@@ -9,7 +9,7 @@ import {
   type TareaEntrada,
 } from '@sige/types';
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
-import { aFechaDb, formatearFechaPeruana } from '../../common/dates';
+import { aFechaDb, aFechaIso, formatearFechaPeruana } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PermisosEfectivosService } from '../access-control/effective-permissions.service';
 import { actorDesde, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
@@ -66,7 +66,13 @@ export class GestionTareasService {
     const tareaId = await this.prisma.$transaction(async (tx) => {
       const codigo = await generarCodigoTarea(tx);
       const tarea = await tx.tarea.create({
-        data: { ...datosTarea(entrada), codigo, asignadoPorId: usuario.usuarioId, plantillaId: entrada.plantillaId },
+        data: {
+          ...datosTarea(entrada),
+          codigo,
+          asignadoPorId: usuario.usuarioId,
+          plantillaId: entrada.plantillaId,
+          seguimientoEstricto: true,
+        },
       });
 
       if (entrada.items.length > 0) {
@@ -158,6 +164,13 @@ export class GestionTareasService {
       throw new ForbiddenException({
         mensaje: 'Solo quien asignó la tarea o Gerencia puede modificarla mientras esté abierta.',
         errores: [],
+      });
+    }
+
+    if (anterior.seguimientoEstricto && aFechaIso(anterior.fechaLimite) !== entrada.fechaLimite) {
+      throw new BadRequestException({
+        mensaje: 'La fecha límite no se edita directamente.',
+        errores: [{ campo: 'fechaLimite', mensaje: 'El responsable debe pedir una prórroga y usted aprobarla.' }],
       });
     }
 
@@ -265,9 +278,25 @@ export class GestionTareasService {
       throw new ForbiddenException({ mensaje: 'Solo el responsable o un colaborador puede iniciar la tarea.', errores: [] });
     }
 
+    await this.asegurarRecibida(id);
+
     await this.prisma.$transaction(async (tx) => {
       await this.cambiarEstado(id, 'INICIAR', usuario, contexto, 'Tarea iniciada', tx);
     });
+  }
+
+  async asegurarRecibida(id: string): Promise<void> {
+    const tarea = await this.prisma.tarea.findUniqueOrThrow({
+      where: { id },
+      select: { seguimientoEstricto: true, recibidaEn: true },
+    });
+
+    if (tarea.seguimientoEstricto && tarea.recibidaEn === null) {
+      throw new ConflictException({
+        mensaje: 'Primero el responsable debe confirmar que recibió la tarea.',
+        errores: [],
+      });
+    }
   }
 
   async cambiarEstado(
