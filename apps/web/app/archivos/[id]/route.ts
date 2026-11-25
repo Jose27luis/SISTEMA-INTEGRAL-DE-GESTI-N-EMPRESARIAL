@@ -1,15 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { descargarDeApi } from '@/lib/api';
-
-const CABECERAS_PERMITIDAS = [
-  'content-type',
-  'content-length',
-  'content-disposition',
-  'x-content-type-options',
-  'cache-control',
-  'content-security-policy',
-];
+import { reenviarAApi } from '@/lib/api-proxy';
 
 export async function GET(
   solicitud: NextRequest,
@@ -22,24 +13,5 @@ export async function GET(
   }
 
   const descarga = solicitud.nextUrl.searchParams.get('descarga') === '1' ? '?descarga=1' : '';
-  const respuesta = await descargarDeApi(`/archivos/${id}${descarga}`, solicitud.signal);
-
-  if (respuesta === null || respuesta.body === null) {
-    return new NextResponse('No tiene acceso a este archivo o ya no está disponible.', {
-      status: 404,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    });
-  }
-
-  const cabeceras = new Headers();
-
-  for (const nombre of CABECERAS_PERMITIDAS) {
-    const valor = respuesta.headers.get(nombre);
-
-    if (valor !== null) {
-      cabeceras.set(nombre, valor);
-    }
-  }
-
-  return new NextResponse(respuesta.body, { headers: cabeceras });
+  return reenviarAApi(solicitud, `/archivos/${id}${descarga}`);
 }
