@@ -4080,6 +4080,28 @@ Aplica a toda tarea creada desde esta versión (`tareas.seguimiento_estricto = t
 
 **Verificación por la API** en el entorno de prueba: revisor entre los responsables, un solo responsable y responsables repetidos se rechazaron con 400; un lote de 3 creó 3 tareas estrictas con su lista de verificación y sin el responsable repetido como colaborador; la carga reflejó las tareas y sus vencimientos, y respondió 403 a un usuario sin permiso de crear. Las páginas de nueva tarea, duplicado, lista y detalle se generaron sin errores. La interfaz la revisa el usuario.
 
+### 12.20 Hora de inicio y hora límite en tareas
+
+Pedido de Gerencia: poder indicar la hora, además del día, en el inicio y la fecha límite.
+
+**Diseño:** las fechas siguen siendo días (`fecha_inicio`, `fecha_limite`), así que reportes, indicadores, obligaciones, recurrencias y proyectos no cambian. Se agregan dos horas opcionales en formato `HH:MM` (24 horas, hora de Lima):
+
+| Campo | Regla |
+|---|---|
+| `hora_inicio` | Opcional; exige fecha de inicio. Si inicio y límite son el mismo día, debe ser anterior a la hora límite. |
+| `hora_limite` | Opcional. Sin hora, la tarea vence al final del día, como antes. Con hora, pasa a «Vencida» y «Atrasada» apenas pasa esa hora del día límite. |
+
+**Dónde se nota:**
+- Constructor de nueva tarea y formulario de edición: reloj al lado de cada fecha. En tareas con seguimiento estricto, la fecha y la hora límite solo cambian con prórroga.
+- Prórrogas: se puede proponer una hora. Con hora se puede pedir más plazo el mismo día. La regla de la base compara fecha y hora juntas, y toma «sin hora» como el final del día.
+- Detalle, tarjetas, lista, inicio, proyectos y avisos muestran «25/11/2026 a las 12:00».
+- Semáforo, «Atrasada», el filtro de atrasadas, «Mi trabajo» y el escalamiento a Gerencia usan la hora. Para que el aviso llegue a tiempo, el proceso `seguimiento-de-tareas` pasó de cada hora a cada 15 minutos.
+- Las listas ordenan por fecha y luego por hora; las tareas sin hora van al final del día.
+
+**Datos:** migración `20261203120000_horas_de_tarea` con columnas `hora_inicio` y `hora_limite` en `tareas` y `hora_anterior` y `hora_propuesta` en `prorrogas_tarea`, validaciones de formato y la regla de prórroga reemplazada. Las tareas existentes quedan sin hora y siguen igual.
+
+**Verificación por la API** en el entorno de prueba: una hora no válida, una hora de inicio sin fecha y una hora límite anterior a la de inicio el mismo día se rechazaron con 400. Una tarea que vencía a las 12:00 apareció vencida y atrasada a las 12:27 (en el filtro y en «Mi trabajo»), mientras que las de las 23:00 y sin hora siguieron «Por vencer». Cambiar la hora de una tarea estricta se rechazó; la prórroga a una hora anterior se rechazó, la de 23:00 a 23:30 del mismo día se aceptó y su aprobación actualizó la hora. Los avisos muestran la hora. Las páginas se generaron sin errores. La interfaz la revisa el usuario.
+
 ---
 
 ## Licencia y titularidad
