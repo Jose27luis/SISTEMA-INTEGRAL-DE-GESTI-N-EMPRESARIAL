@@ -4022,6 +4022,39 @@ Primera de tres partes del rediseño de tareas pedido por Gerencia:
 
 **Pendiente:** llevar el cargador y el visor a documentos, entregables, vouchers y constancias, que hoy siguen con su formulario anterior de hasta 24 MB.
 
+### 12.18 Tareas a medida, parte B: seguimiento estricto
+
+Aplica a toda tarea creada desde esta versión (`tareas.seguimiento_estricto = true`). Las tareas anteriores conservan sus reglas: no se les exige acuse ni se les cuentan reportes, aunque sí muestran la barra de estados y el semáforo.
+
+**Reglas:**
+
+| Regla | Detalle |
+|---|---|
+| Acuse de recibo | El responsable confirma la recepción con «Confirmar recepción». Hasta hacerlo no puede iniciar la tarea ni registrar avances. A las 24 horas sin acuse se avisa una vez a quien asignó y al responsable. |
+| Reporte de avance | Plazo en días hábiles (lunes a viernes) desde el último avance o desde el acuse: urgente 1, alta 2, media 3, baja 5. Vencido el plazo, la tarea muestra «Sin reporte» y se avisa al responsable y a quien asignó, una vez por cada plazo. |
+| Fecha límite | No se edita directamente. El responsable o un colaborador pide una prórroga con nueva fecha y motivo (mínimo 10 caracteres); quien asignó o Gerencia la aprueba o la rechaza con explicación. Solo puede haber una prórroga pendiente por tarea. Al aprobarse cambia la fecha límite. |
+| Envío a revisión | Exige avance al 100 %, la lista de verificación completa y, si la tarea lo pide, evidencia adjunta. El detalle muestra estos requisitos con su estado. |
+| Escalamiento | Una tarea abierta y vencida se avisa a los usuarios de Gerencia, una vez por cada fecha límite. |
+
+**Semáforo:** «A tiempo», «Por vencer» (faltan 2 días o menos), «Vencida» y «Cerrada». Se ve en el detalle y en el borde de las tarjetas, que además muestran «Por confirmar recepción», «Sin acuse +24 h» y «Sin reporte».
+
+**Barra de estados:** Asignada → Recibida → En proceso → En revisión → Aprobada → Finalizada. Cada paso muestra la fecha, la persona y el tiempo que estuvo en esa etapa. «Recibida» aparece solo en tareas con seguimiento estricto, y «En revisión» y «Aprobada» solo si la tarea requiere aprobación. Las observaciones del revisor se cuentan sobre el paso «En revisión».
+
+**Datos:**
+- Migración `20261202120000_seguimiento_estricto`:
+  - Columnas `seguimiento_estricto`, `recibida_en` y `ultimo_reporte_en` en `tareas`; esta última se llena con el último avance de las tareas existentes.
+  - Tabla `prorrogas_tarea`, con restricciones: fecha propuesta posterior a la anterior, motivo suficiente, resolución completa, rechazo explicado y una sola pendiente por tarea (índice único parcial).
+  - Cinco tipos de aviso nuevos: `TAREA_SIN_ACUSE`, `TAREA_SIN_REPORTE`, `TAREA_ESCALADA`, `PRORROGA_SOLICITADA` y `PRORROGA_RESUELTA`.
+- API: `POST /tareas/:id/acuse`, `POST /tareas/:id/prorrogas` y `POST /tareas/:id/prorrogas/:prorrogaId/resolucion`.
+- Proceso `seguimiento-de-tareas` en el worker: cada hora, en el minuto 20, con bloqueo para una sola instancia y registro en `ejecuciones_proceso`.
+
+**Verificación por la API** en el entorno de prueba:
+- Iniciar antes del acuse respondió 409, y el acuse de alguien que no es el responsable, 403; el segundo acuse, 409.
+- Editar la fecha límite respondió 400 con la indicación de pedir prórroga.
+- Prórroga con fecha anterior o motivo corto: 400. Segunda prórroga pendiente: 409. Resolución por la responsable: 403. Rechazo sin explicación: 400. La aprobación cambió la fecha límite.
+- Enviar a revisión al 0 % y con la lista incompleta respondió 400 con ambos requisitos.
+- Una tarea simulada con 30 horas sin acuse y vencida generó los avisos de sin acuse (2) y de escalamiento (1); una segunda corrida no los repitió.
+
 ---
 
 ## Licencia y titularidad
