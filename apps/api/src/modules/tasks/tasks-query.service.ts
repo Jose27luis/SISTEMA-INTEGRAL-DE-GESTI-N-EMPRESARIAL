@@ -2,6 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
   accionDeEnvio,
+  type CargaEquipo,
+  type CargaPersona,
+  DIAS_CALENDARIO_CARGA,
+  DIAS_POR_VENCER,
   ESTADOS_CERRADOS,
   ESTADOS_CON_AVANCE,
   estadoTrasAccion,
@@ -136,6 +140,65 @@ export class ConsultaTareasService {
     ]);
 
     return { usuarios, clientes: clientes.map(({ id, razonSocial }) => ({ id, nombre: razonSocial })) };
+  }
+
+  async cargaEquipo(): Promise<CargaEquipo> {
+    const hoy = fechaHoyEnLima();
+    const limitePorVencer = sumarDias(hoy, DIAS_POR_VENCER);
+    const limiteCalendario = sumarDias(hoy, DIAS_CALENDARIO_CARGA);
+    const [usuarios, abiertas] = await Promise.all([
+      this.prisma.usuario.findMany({
+        where: { activo: true },
+        orderBy: { nombre: 'asc' },
+        select: { id: true, nombre: true },
+      }),
+      this.prisma.tarea.findMany({
+        where: { estado: { notIn: [...ESTADOS_CERRADOS] } },
+        select: {
+          responsableId: true,
+          fechaLimite: true,
+          prioridad: true,
+          estado: true,
+          seguimientoEstricto: true,
+          recibidaEn: true,
+        },
+      }),
+    ]);
+    const cargas = new Map<string, CargaPersona & { dias: Map<string, number> }>(
+      usuarios.map((persona) => [
+        persona.id,
+        { ...persona, abiertas: 0, vencidas: 0, porVencer: 0, urgentes: 0, porConfirmar: 0, vencimientos: [], dias: new Map() },
+      ]),
+    );
+
+    for (const tarea of abiertas) {
+      const carga = cargas.get(tarea.responsableId);
+
+      if (carga === undefined) {
+        continue;
+      }
+
+      const fecha = aFechaIso(tarea.fechaLimite);
+      carga.abiertas += 1;
+      carga.vencidas += fecha < hoy ? 1 : 0;
+      carga.porVencer += fecha >= hoy && fecha <= limitePorVencer ? 1 : 0;
+      carga.urgentes += tarea.prioridad === 'URGENTE' ? 1 : 0;
+      carga.porConfirmar += tarea.seguimientoEstricto && tarea.estado === 'PENDIENTE' && tarea.recibidaEn === null ? 1 : 0;
+
+      if (fecha >= hoy && fecha <= limiteCalendario) {
+        carga.dias.set(fecha, (carga.dias.get(fecha) ?? 0) + 1);
+      }
+    }
+
+    return {
+      hoy,
+      personas: [...cargas.values()].map(({ dias, ...carga }) => ({
+        ...carga,
+        vencimientos: [...dias.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([fecha, cantidad]) => ({ fecha, cantidad })),
+      })),
+    };
   }
 
   async miTrabajo(usuario: UsuarioAutenticado): Promise<MiTrabajo> {
