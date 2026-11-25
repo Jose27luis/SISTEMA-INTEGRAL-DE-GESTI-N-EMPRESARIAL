@@ -8,7 +8,7 @@ import {
   type Prioridad,
 } from '@sige/types';
 import { cn } from '@sige/ui/cn';
-import { Alerta, AreaTexto, Campo, CampoFecha, Casilla, Seleccion } from '@sige/ui/components';
+import { Alerta, AreaTexto, Campo, CampoFecha, CampoHora, Casilla, Seleccion } from '@sige/ui/components';
 import { type ReactNode, useActionState, useEffect, useMemo, useRef, useState } from 'react';
 import { z } from 'zod';
 import { MensajeFormulario } from '@/components/form-message';
@@ -26,7 +26,9 @@ const esquemaBorrador = z.object({
   clienteId: z.string(),
   prioridad: z.enum(PRIORIDADES),
   fechaInicio: z.string(),
+  horaInicio: z.string().default(''),
   fechaLimite: z.string(),
+  horaLimite: z.string().default(''),
   responsableIds: z.array(z.string()),
   colaboradorIds: z.array(z.string()),
   revisorId: z.string(),
@@ -36,7 +38,7 @@ const esquemaBorrador = z.object({
   items: z.array(z.string()),
 });
 
-export type Borrador = z.infer<typeof esquemaBorrador>;
+export type Borrador = z.output<typeof esquemaBorrador>;
 
 const esquemaGuardado = z.object({ guardadoEn: z.iso.datetime(), datos: esquemaBorrador });
 
@@ -192,6 +194,13 @@ export function ConstructorTarea({
         ? [{ campo: 'seccion-responsable', texto: 'Al menos dos responsables, o cambie a una persona' }]
         : []),
     ...(datos.fechaLimite === '' ? [{ campo: 'fechaLimite', texto: 'Fecha límite' }] : []),
+    ...(datos.fechaInicio !== '' &&
+    datos.fechaInicio === datos.fechaLimite &&
+    datos.horaInicio !== '' &&
+    datos.horaLimite !== '' &&
+    datos.horaInicio >= datos.horaLimite
+      ? [{ campo: 'horaLimite', texto: 'Hora límite posterior a la de inicio' }]
+      : []),
     ...(datos.requiereAprobacion && datos.revisorId === '' ? [{ campo: 'revisorId', texto: 'Revisor' }] : []),
     ...(datos.requiereEvidencia && datos.evidenciaRequerida.trim() === ''
       ? [{ campo: 'evidenciaRequerida', texto: 'Evidencia esperada' }]
@@ -398,28 +407,56 @@ export function ConstructorTarea({
         <Seccion numero={3} titulo="Para cuándo" descripcion="Elija la fecha mirando los vencimientos que ya tiene el responsable.">
           <div className="grid gap-5 @container xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
             <div className="flex flex-col gap-4">
-              <CampoFecha
-                id="fechaInicio"
-                name="fechaInicio"
-                etiqueta="Inicio"
-                value={datos.fechaInicio}
-                onChange={(evento) => {
-                  cambiar('fechaInicio', evento.target.value);
-                }}
-                error={estado.errores.fechaInicio}
-              />
-              <CampoFecha
-                id="fechaLimite"
-                name="fechaLimite"
-                etiqueta="Fecha límite"
-                required
-                min={minimoLimite}
-                value={datos.fechaLimite}
-                onChange={(evento) => {
-                  cambiar('fechaLimite', evento.target.value);
-                }}
-                error={estado.errores.fechaLimite}
-              />
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,8.5rem)] gap-3">
+                <CampoFecha
+                  id="fechaInicio"
+                  name="fechaInicio"
+                  etiqueta="Inicio"
+                  value={datos.fechaInicio}
+                  onChange={(evento) => {
+                    cambiar('fechaInicio', evento.target.value);
+                  }}
+                  error={estado.errores.fechaInicio}
+                />
+                <CampoHora
+                  id="horaInicio"
+                  name="horaInicio"
+                  etiqueta="Hora"
+                  value={datos.horaInicio}
+                  onChange={(evento) => {
+                    cambiar('horaInicio', evento.target.value);
+                  }}
+                  error={estado.errores.horaInicio}
+                />
+              </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,8.5rem)] gap-3">
+                <CampoFecha
+                  id="fechaLimite"
+                  name="fechaLimite"
+                  etiqueta="Fecha límite"
+                  required
+                  min={minimoLimite}
+                  value={datos.fechaLimite}
+                  onChange={(evento) => {
+                    cambiar('fechaLimite', evento.target.value);
+                  }}
+                  error={estado.errores.fechaLimite}
+                />
+                <CampoHora
+                  id="horaLimite"
+                  name="horaLimite"
+                  etiqueta="Hora límite"
+                  value={datos.horaLimite}
+                  onChange={(evento) => {
+                    cambiar('horaLimite', evento.target.value);
+                  }}
+                  error={estado.errores.horaLimite}
+                />
+              </div>
+              <p className="-mt-1 text-xs text-apagado">
+                Las horas son opcionales. Sin hora límite, la tarea vence al final del día; con hora, se marca vencida
+                apenas pasa esa hora.
+              </p>
             </div>
             <CalendarioVencimientos
               hoy={carga.hoy}
@@ -511,6 +548,7 @@ export function ConstructorTarea({
             cliente: clientes.find(({ id }) => id === datos.clienteId)?.nombre ?? null,
             prioridad: datos.prioridad,
             fechaLimite: datos.fechaLimite,
+            horaLimite: datos.horaLimite,
             responsables: nombresResponsables,
             colaboradores: datos.colaboradorIds.map((id) => nombres.get(id) ?? '').filter((nombre) => nombre !== ''),
             revisor: nombres.get(datos.revisorId) ?? null,
