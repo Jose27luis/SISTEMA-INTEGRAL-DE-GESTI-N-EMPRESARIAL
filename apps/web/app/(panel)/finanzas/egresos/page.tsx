@@ -122,6 +122,7 @@ export default async function PaginaEgresos({ searchParams }: { searchParams: Pr
                             {formatearFecha(egreso.fecha)} · {egreso.categoria} · {egreso.medioPago}
                             {egreso.proveedor === null ? '' : ` · ${egreso.proveedor.razonSocial}`}
                             {egreso.cliente === null ? '' : ` · Cliente: ${egreso.cliente.razonSocial}`}
+                            {egreso.proyecto === null ? '' : ` · Proyecto: ${egreso.proyecto.codigo}`}
                           </p>
                           <p className="text-xs text-apagado">
                             Responsable: {egreso.responsable.nombre}
