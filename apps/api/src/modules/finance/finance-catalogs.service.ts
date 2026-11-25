@@ -136,7 +136,7 @@ export class CatalogosFinancierosService {
 
   async opciones(usuario: UsuarioAutenticado): Promise<OpcionesFinanzas> {
     const activo = { activo: true };
-    const [clientes, servicios, mediosPago, categorias, proveedores, responsables] = await Promise.all([
+    const [clientes, servicios, mediosPago, categorias, proveedores, responsables, proyectos] = await Promise.all([
       this.prisma.cliente.findMany({
         where: { estado: { not: 'INACTIVO' } },
         orderBy: { razonSocial: 'asc' },
@@ -149,6 +149,13 @@ export class CatalogosFinancierosService {
       usuario.permisos.has('finanza:egresos')
         ? this.prisma.usuario.findMany({ where: activo, orderBy: { nombre: 'asc' }, select: { id: true, nombre: true } })
         : Promise.resolve([]),
+      usuario.permisos.has('finanza:egresos')
+        ? this.prisma.proyecto.findMany({
+            where: { estado: { in: ['PLANIFICADO', 'EN_CURSO', 'EN_PAUSA'] } },
+            orderBy: { codigo: 'desc' },
+            select: { id: true, codigo: true, nombre: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     return {
@@ -158,6 +165,7 @@ export class CatalogosFinancierosService {
       categorias,
       proveedores,
       responsables,
+      proyectos,
       puedeIngresos: usuario.permisos.has('finanza:ingresos'),
       puedeEgresos: usuario.permisos.has('finanza:egresos'),
       puedeAnular: usuario.permisos.has('finanza:anular'),
