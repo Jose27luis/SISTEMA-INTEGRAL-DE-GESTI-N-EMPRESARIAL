@@ -53,6 +53,10 @@ export function formatearFechaPeruana(fecha: string): string {
   return `${dia ?? ''}/${mes ?? ''}/${anio ?? ''}`;
 }
 
+export function formatearPlazoPeruano(fecha: string, hora: string | null): string {
+  return hora === null ? formatearFechaPeruana(fecha) : `${formatearFechaPeruana(fecha)} a las ${hora}`;
+}
+
 export function aFechaIsoONula(fecha: Date | null): string | null {
   return fecha === null ? null : aFechaIso(fecha);
 }
