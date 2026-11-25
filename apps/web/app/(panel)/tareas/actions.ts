@@ -1,6 +1,7 @@
 'use server';
 
 import {
+  esquemaAsignacionMasiva,
   esquemaAvanceEntrada,
   esquemaCancelacionEntrada,
   esquemaComentarioEntrada,
@@ -10,6 +11,7 @@ import {
   esquemaItemEntrada,
   esquemaProrrogaEntrada,
   esquemaResolucionProrroga,
+  esquemaResultadoAsignacionMasiva,
   esquemaRevisionEntrada,
   esquemaTareaDetalle,
   esquemaTareaEntrada,
@@ -106,7 +108,32 @@ export async function marcarItem(
 
 export async function crearTarea(_anterior: EstadoFormulario, datos: FormData): Promise<EstadoFormulario> {
   const valores = valoresDeFormulario(datos);
-  const entrada = esquemaTareaEntrada.safeParse(leerTarea(datos));
+  const responsableIds = leerLista(datos, 'responsableIds');
+  const base = { ...leerTarea(datos), items: leerLista(datos, 'items') };
+
+  if (responsableIds.length > 1) {
+    const masiva = esquemaAsignacionMasiva.safeParse({ ...base, responsableIds });
+
+    if (!masiva.success) {
+      return estadoDesdeProblemas(masiva.error.issues, valores);
+    }
+
+    const lote = await solicitarApi('/tareas/lote', {
+      metodo: 'POST',
+      cuerpo: masiva.data,
+      esquema: esquemaResultadoAsignacionMasiva,
+    });
+
+    if (!lote.ok) {
+      return estadoConError(lote.error, valores);
+    }
+
+    revalidatePath('/tareas');
+    revalidatePath('/mi-trabajo');
+    redirect(`/tareas?asignadas=${String(lote.datos.tareas.length)}`);
+  }
+
+  const entrada = esquemaTareaEntrada.safeParse({ ...base, responsableId: responsableIds[0] ?? '' });
 
   if (!entrada.success) {
     return estadoDesdeProblemas(entrada.error.issues, valores);
