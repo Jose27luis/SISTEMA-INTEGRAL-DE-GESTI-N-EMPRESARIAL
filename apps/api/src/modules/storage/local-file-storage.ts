@@ -37,8 +37,12 @@ export class AlmacenArchivosLocal extends AlmacenArchivos {
     };
   }
 
-  leer(ruta: string): Readable {
-    return createReadStream(this.resolver(ruta));
+  leer(ruta: string, rango?: { inicio: number; fin: number }): Readable {
+    return createReadStream(this.resolver(ruta), rango === undefined ? {} : { start: rango.inicio, end: rango.fin });
+  }
+
+  rutaAbsoluta(ruta: string): string {
+    return this.resolver(ruta);
   }
 
   private resolver(ruta: string): string {
