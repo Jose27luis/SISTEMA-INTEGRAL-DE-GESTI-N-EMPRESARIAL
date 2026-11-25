@@ -1,10 +1,27 @@
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
 import { cn } from '../cn';
+import { CampoFecha, CampoMes } from './date-picker';
 import { CLASES_CONTROL, type DescripcionCampo, Envoltura, idsDescripcion } from './field-base';
+import { CampoHora } from './time-picker';
 
 export type PropiedadesCampo = DescripcionCampo & InputHTMLAttributes<HTMLInputElement>;
 
 export function Campo({ id, etiqueta, ayuda, error, className, ...resto }: PropiedadesCampo): ReactNode {
+  const { type: tipo, ...sinTipo } = resto;
+  const propiedades = { id, etiqueta, ayuda, error, className, ...sinTipo };
+
+  if (tipo === 'date') {
+    return <CampoFecha {...propiedades} />;
+  }
+
+  if (tipo === 'month') {
+    return <CampoMes {...propiedades} />;
+  }
+
+  if (tipo === 'time') {
+    return <CampoHora {...propiedades} />;
+  }
+
   return (
     <Envoltura id={id} etiqueta={etiqueta} ayuda={ayuda} error={error}>
       <input
