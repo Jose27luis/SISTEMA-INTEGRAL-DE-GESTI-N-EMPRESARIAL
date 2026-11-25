@@ -64,14 +64,41 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       MFA_CLAVE_CIFRADO: ${MFA_CLAVE_CIFRADO}
       DIRECTORIO_ARCHIVOS: /app/almacen
+      CONVERSOR_URL: http://conversor:3000
       TZ: America/Lima
+    volumes:
+      - archivos:/app/almacen
     depends_on:
       api:
+        condition: service_healthy
+      conversor:
         condition: service_healthy
     deploy:
       resources:
         limits:
           memory: 384M
+    networks:
+      - sige-net
+
+  conversor:
+    image: gotenberg/gotenberg:8.15.3
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --api-timeout=180s
+      - --chromium-auto-start=false
+      - --libreoffice-restart-after=20
+      - --log-level=warn
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:3000/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
     networks:
       - sige-net
 
