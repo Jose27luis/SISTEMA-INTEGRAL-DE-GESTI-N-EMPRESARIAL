@@ -2,7 +2,7 @@ import { type EstadoTarea, ETIQUETAS_ESTADO_TAREA, type ProyectoDetalle, type Ta
 import { cn } from '@sige/ui/cn';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { formatearFecha } from '@/lib/format';
+import { formatearFecha, formatearPlazo } from '@/lib/format';
 
 const MS_POR_DIA = 86_400_000;
 
@@ -107,7 +107,7 @@ export function Cronograma({ proyecto, hoy }: { proyecto: ProyectoDetalle; hoy: 
                                 ? 'bg-borde'
                                 : 'bg-dorado'
                         }
-                        titulo={`${tarea.titulo}: vence ${formatearFecha(tarea.fechaLimite)} · ${ETIQUETAS_ESTADO_TAREA[tarea.estado]}`}
+                        titulo={`${tarea.titulo}: vence ${formatearPlazo(tarea.fechaLimite, tarea.horaLimite)} · ${ETIQUETAS_ESTADO_TAREA[tarea.estado]}`}
                       />
                     </span>
                   </div>
@@ -154,7 +154,7 @@ function TarjetaKanban({ tarea, etapa }: { tarea: TareaProyecto; etapa: string }
         {tarea.codigo} · {etapa}
       </p>
       <p className="text-xs text-apagado">
-        {tarea.responsable.nombre} · vence {formatearFecha(tarea.fechaLimite)}
+        {tarea.responsable.nombre} · vence {formatearPlazo(tarea.fechaLimite, tarea.horaLimite)}
         {tarea.estado === 'OBSERVADA' ? ' · observada' : ''}
       </p>
       <p className={cn('text-xs tabular-nums', tarea.atrasada ? 'font-semibold text-rojo' : 'text-tinta')}>
