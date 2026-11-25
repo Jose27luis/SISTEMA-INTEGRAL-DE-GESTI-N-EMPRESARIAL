@@ -100,6 +100,7 @@ model Usuario {
   proyectosMiembro        MiembroProyecto[]    @relation("MiembroDeProyecto")
   entregablesEntregados   Entregable[]         @relation("EntregadorDeEntregable")
   entregablesRevisados    Entregable[]         @relation("RevisorDeEntregable")
+  subidas                 Subida[]
 
   @@map("usuarios")
 }
@@ -612,6 +613,8 @@ model Archivo {
   vouchers        Cobro[]
   comprobantesEgreso Egreso[]
   entregables        Entregable[]
+  vistaPrevia        VistaPrevia?
+  subida             Subida?
 
   @@map("archivos")
 }
@@ -1356,4 +1359,58 @@ model Entregable {
 
   @@index([etapaId])
   @@map("entregables")
+}
+
+enum EstadoSubida {
+  EN_CURSO
+  COMPLETA
+  USADA
+  EXPIRADA
+}
+
+enum EstadoVistaPrevia {
+  PENDIENTE
+  PROCESANDO
+  LISTA
+  ERROR
+  NO_APLICA
+}
+
+model Subida {
+  id            String       @id @default(uuid()) @db.Uuid
+  usuarioId     String       @map("usuario_id") @db.Uuid
+  nombre        String
+  tamanoBytes   Int          @map("tamano_bytes")
+  recibidos     Int          @default(0)
+  estado        EstadoSubida @default(EN_CURSO)
+  rutaTemporal  String       @unique @map("ruta_temporal")
+  rutaFinal     String?      @unique @map("ruta_final")
+  mime          String?
+  sha256        String?      @db.Char(64)
+  archivoId     String?      @unique @map("archivo_id") @db.Uuid
+  creadoEn      DateTime     @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime     @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+  expiraEn      DateTime     @map("expira_en") @db.Timestamptz(3)
+
+  usuario Usuario  @relation(fields: [usuarioId], references: [id])
+  archivo Archivo? @relation(fields: [archivoId], references: [id])
+
+  @@index([estado, expiraEn])
+  @@index([usuarioId, estado])
+  @@map("subidas")
+}
+
+model VistaPrevia {
+  archivoId     String            @id @map("archivo_id") @db.Uuid
+  estado        EstadoVistaPrevia @default(PENDIENTE)
+  rutaPdf       String?           @map("ruta_pdf")
+  intentos      Int               @default(0)
+  error         String?
+  creadoEn      DateTime          @default(now()) @map("creado_en") @db.Timestamptz(3)
+  actualizadoEn DateTime          @updatedAt @map("actualizado_en") @db.Timestamptz(3)
+
+  archivo Archivo @relation(fields: [archivoId], references: [id])
+
+  @@index([estado, actualizadoEn])
+  @@map("vistas_previas")
 }
