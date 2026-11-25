@@ -41,7 +41,7 @@ function CampoAdjunto({ nombre, etiqueta, error }: { nombre: string; etiqueta: s
   );
 }
 
-function OpcionesComprobante(): ReactNode {
+function opcionesComprobante(): ReactNode {
   return (
     <>
       <option value="">Sin comprobante aún</option>
@@ -144,7 +144,7 @@ export function FormularioIngreso({
           defaultValue={valor('tipoComprobante', '')}
           error={estado.errores.tipoComprobante}
         >
-          <OpcionesComprobante />
+          {opcionesComprobante()}
         </Seleccion>
         <Campo
           id="serieNumero"
@@ -437,7 +437,7 @@ export function FormularioEgreso({
           defaultValue={valor('tipoComprobante', '')}
           error={estado.errores.tipoComprobante}
         >
-          <OpcionesComprobante />
+          {opcionesComprobante()}
         </Seleccion>
         <Campo
           id="serieNumero-egreso"
