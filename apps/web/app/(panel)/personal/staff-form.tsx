@@ -10,6 +10,7 @@ import type {
 import { AreaTexto, Campo, Casilla, Seleccion } from '@sige/ui/components';
 import Link from 'next/link';
 import { type ReactNode, useActionState, useState } from 'react';
+import { SelectorJornada } from '@/components/work-schedule';
 import { MensajeFormulario } from '@/components/form-message';
 import { CampoContrasena } from '@/components/password-field';
 import { BotonEnvio } from '@/components/submit-button';
@@ -186,15 +187,15 @@ export function FormularioTrabajador({
               </option>
             ))}
         </Seleccion>
-        <Campo
-          id="horario"
-          name="horario"
-          etiqueta="Horario o jornada"
-          ayuda="Por ejemplo: lunes a viernes de 8:00 a 17:00."
-          maxLength={120}
-          defaultValue={valor('horario', trabajador?.horario)}
-          error={estado.errores.horario}
-        />
+        <div className="sm:col-span-2">
+          <SelectorJornada
+            key={estado.valores.horario ?? trabajador?.horario ?? 'nuevo'}
+            nombre="horario"
+            etiqueta="Horario o jornada"
+            valorInicial={valor('horario', trabajador?.horario ?? undefined)}
+            error={estado.errores.horario}
+          />
+        </div>
         <div className="sm:col-span-2">
           <AreaTexto
             id="funciones"
