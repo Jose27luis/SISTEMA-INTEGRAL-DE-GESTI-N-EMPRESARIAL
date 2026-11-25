@@ -463,6 +463,21 @@ export function FormularioEgreso({
           </option>
         ))}
       </Seleccion>
+      <Seleccion
+        id="proyectoId-egreso"
+        name="proyectoId"
+        etiqueta="Proyecto (opcional)"
+        ayuda="Suma al costo del proyecto; si el proyecto es de un cliente, el egreso queda asignado a ese cliente."
+        defaultValue={valor('proyectoId', '')}
+        error={estado.errores.proyectoId}
+      >
+        <option value="">Sin proyecto</option>
+        {opciones.proyectos.map((proyecto) => (
+          <option key={proyecto.id} value={proyecto.id}>
+            {proyecto.codigo} · {proyecto.nombre}
+          </option>
+        ))}
+      </Seleccion>
       <CampoAdjunto nombre="comprobante" etiqueta="Comprobante escaneado (opcional)" error={estado.errores.comprobante} />
       <AreaTexto
         id="observaciones-egreso"
