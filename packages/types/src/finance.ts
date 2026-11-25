@@ -325,6 +325,7 @@ export const esquemaEgresoEntrada = z
     responsableId: z.uuid('Seleccione al responsable.'),
     medioPagoId: z.uuid('Seleccione el medio de pago.'),
     clienteId: idOpcional,
+    proyectoId: idOpcional.default(null),
     observaciones: textoOpcional(1000),
   })
   .superRefine((egreso, contexto) => {
@@ -347,6 +348,7 @@ export const esquemaEgreso = z.object({
   responsable: esquemaPersona,
   medioPago: z.string(),
   cliente: z.object({ id: z.uuid(), razonSocial: z.string() }).nullable(),
+  proyecto: z.object({ id: z.uuid(), codigo: z.string(), nombre: z.string() }).nullable(),
   observaciones: z.string().nullable(),
   registradoPor: z.string(),
   registradoEn: z.iso.datetime(),
@@ -385,6 +387,7 @@ export const esquemaOpcionesFinanzas = z.object({
   categorias: z.array(z.object({ id: z.uuid(), nombre: z.string() })),
   proveedores: z.array(z.object({ id: z.uuid(), razonSocial: z.string() })),
   responsables: z.array(esquemaPersona),
+  proyectos: z.array(z.object({ id: z.uuid(), codigo: z.string(), nombre: z.string() })),
   puedeIngresos: z.boolean(),
   puedeEgresos: z.boolean(),
   puedeAnular: z.boolean(),
