@@ -4,7 +4,7 @@ import { Insignia } from '@sige/ui/components';
 import { CalendarClock } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { formatearFecha } from '@/lib/format';
+import { formatearPlazo } from '@/lib/format';
 import { BarraAvance, EstadoTareaInsignia, PrioridadInsignia } from './task-badges';
 
 interface PropiedadesTarjetaTarea {
@@ -42,7 +42,7 @@ export function TarjetaTarea({ tarea, mostrarEstado = true }: PropiedadesTarjeta
         >
           <CalendarClock aria-hidden="true" className="size-4" />
           {tarea.atrasada ? 'Venció el ' : 'Vence el '}
-          {formatearFecha(tarea.fechaLimite)}
+          {formatearPlazo(tarea.fechaLimite, tarea.horaLimite)}
         </span>
         {mostrarEstado ? <EstadoTareaInsignia estado={tarea.estado} /> : null}
       </div>
