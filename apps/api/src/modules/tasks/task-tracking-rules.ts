@@ -10,11 +10,13 @@ import {
   type Semaforo,
   semaforoTarea,
 } from '@sige/types';
+import { horaEnLima } from '../../common/dates';
 
 export interface DatosSeguimiento {
   estado: EstadoTarea;
   prioridad: Prioridad;
   fechaLimite: string;
+  horaLimite?: string | null;
   estricto: boolean;
   creadoEn: Date;
   recibidaEn: Date | null;
@@ -34,7 +36,7 @@ function fechaLima(fecha: Date): string {
 }
 
 export function evaluarSeguimiento(datos: DatosSeguimiento, ahora: Date, hoy: string): EstadoSeguimiento {
-  const semaforo = semaforoTarea(datos.estado, datos.fechaLimite, hoy);
+  const semaforo = semaforoTarea(datos.estado, datos.fechaLimite, hoy, datos.horaLimite ?? null, horaEnLima(ahora));
   const abierta = !ESTADOS_CERRADOS.includes(datos.estado);
   const esperandoAcuse = datos.estricto && abierta && datos.estado === 'PENDIENTE' && datos.recibidaEn === null;
   const sinAcuse = esperandoAcuse && ahora.getTime() - datos.creadoEn.getTime() > HORAS_PARA_ACUSE * 3_600_000;
