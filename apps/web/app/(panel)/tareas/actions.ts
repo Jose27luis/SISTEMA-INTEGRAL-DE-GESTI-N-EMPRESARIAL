@@ -111,7 +111,7 @@ export async function marcarItem(
 export async function crearTarea(_anterior: EstadoFormulario, datos: FormData): Promise<EstadoFormulario> {
   const valores = valoresDeFormulario(datos);
   const responsableIds = leerLista(datos, 'responsableIds');
-  const base = { ...leerTarea(datos), items: leerLista(datos, 'items') };
+  const base = { ...leerTarea(datos), items: leerLista(datos, 'items'), subidaIds: leerLista(datos, 'subidaIds') };
 
   if (responsableIds.length > 1) {
     const masiva = esquemaAsignacionMasiva.safeParse({ ...base, responsableIds });
