@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { esquemaReferenciaCatalogo } from './catalogs';
 import { esquemaMetadatosPagina } from './common';
 import { esquemaEstadoTarea } from './task-states';
+import { esquemaListaSubidas } from './uploads';
 
 export const PRIORIDADES = ['BAJA', 'MEDIA', 'ALTA', 'URGENTE'] as const;
 
@@ -241,6 +242,7 @@ export const esquemaAvanceEntrada = z.object({
     .transform((valor) => (valor === '' ? null : valor))
     .pipe(z.uuid().nullable())
     .nullable(),
+  subidaIds: esquemaListaSubidas,
 });
 
 export const esquemaEnvioEntrada = z.object({
