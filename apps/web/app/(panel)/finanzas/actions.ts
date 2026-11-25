@@ -348,6 +348,7 @@ const CAMPOS_EGRESO = [
   'responsableId',
   'medioPagoId',
   'clienteId',
+  'proyectoId',
   'observaciones',
 ] as const;
 
