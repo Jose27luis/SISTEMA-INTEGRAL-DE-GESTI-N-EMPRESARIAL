@@ -11,8 +11,6 @@ import {
   esquemaRevisionEntrada,
   esquemaTareaDetalle,
   esquemaTareaEntrada,
-  MAXIMO_EVIDENCIAS_POR_AVANCE,
-  TAMANO_MAXIMO_EVIDENCIA_MB,
 } from '@sige/types';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -193,6 +191,7 @@ export async function registrarAvance(
     observaciones: leerTexto(datos, 'observaciones'),
     proximoPaso: leerTexto(datos, 'proximoPaso'),
     corrigeAId: leerTexto(datos, 'corrigeAId'),
+    subidaIds: leerLista(datos, 'subidaIds'),
   };
   const entrada = esquemaAvanceEntrada.safeParse(campos);
 
@@ -200,34 +199,16 @@ export async function registrarAvance(
     return estadoDesdeProblemas(entrada.error.issues, valores);
   }
 
-  const archivos = datos
-    .getAll('evidencias')
-    .filter((valor): valor is File => valor instanceof File && valor.size > 0);
-  const totalBytes = archivos.reduce((suma, archivo) => suma + archivo.size, 0);
-
-  if (archivos.length > MAXIMO_EVIDENCIAS_POR_AVANCE || totalBytes > TAMANO_MAXIMO_EVIDENCIA_MB * 1024 * 1024) {
-    return estadoConError(
-      {
-        mensaje: 'Revise los archivos adjuntos.',
-        errores: [
-          {
-            campo: 'evidencias',
-            mensaje: `Adjunte hasta ${String(MAXIMO_EVIDENCIAS_POR_AVANCE)} archivos que sumen como máximo ${String(TAMANO_MAXIMO_EVIDENCIA_MB)} MB.`,
-          },
-        ],
-      },
-      valores,
-    );
-  }
-
   const formulario = new FormData();
 
   for (const [clave, valor] of Object.entries(campos)) {
-    formulario.set(clave, valor);
+    if (typeof valor === 'string') {
+      formulario.set(clave, valor);
+    }
   }
 
-  for (const archivo of archivos) {
-    formulario.append('evidencias', archivo, archivo.name);
+  for (const subidaId of entrada.data.subidaIds) {
+    formulario.append('subidaIds', subidaId);
   }
 
   const resultado = await solicitarApi(`/tareas/${id}/avances`, {
@@ -240,12 +221,13 @@ export async function registrarAvance(
     return estadoConError(resultado.error, valores);
   }
 
+  const adjuntos = entrada.data.subidaIds.length;
   revalidatePath('/tareas', 'layout');
   revalidatePath('/mi-trabajo');
   return estadoExitoso(
-    archivos.length === 0
+    adjuntos === 0
       ? 'Avance registrado.'
-      : `Avance registrado con ${String(archivos.length)} ${archivos.length === 1 ? 'evidencia' : 'evidencias'}.`,
+      : `Avance registrado con ${String(adjuntos)} ${adjuntos === 1 ? 'evidencia' : 'evidencias'}.`,
   );
 }
 
