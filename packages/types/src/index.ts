@@ -19,6 +19,7 @@ export * from './roles';
 export * from './search';
 export * from './staff';
 export * from './task-states';
+export * from './task-tracking';
 export * from './tasks';
 export * from './templates';
 export * from './users';
