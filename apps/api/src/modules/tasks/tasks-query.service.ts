@@ -13,10 +13,11 @@ import {
   type TareaResumen,
 } from '@sige/types';
 import type { UsuarioAutenticado } from '../../common/auth/authenticated-request';
-import { aFechaDb, aIso, aIsoONulo, fechaHoyEnLima } from '../../common/dates';
+import { aFechaDb, aFechaIso, aIso, aIsoONulo, fechaHoyEnLima } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccesoTareasService } from './task-access.service';
 import { aResumenTarea, INCLUSION_RESUMEN_TAREA } from './task-mappers';
+import { armarPasos, evaluarSeguimiento } from './task-tracking-rules';
 
 const DIAS_PROXIMAS = 7;
 
@@ -195,6 +196,10 @@ export class ConsultaTareasService {
         plantilla: { select: { id: true, nombre: true } },
         etapa: { select: { id: true, nombre: true, proyecto: { select: { id: true, codigo: true, nombre: true } } } },
         items: { orderBy: { orden: 'asc' }, include: { completadoPor: { select: { nombre: true } } } },
+        prorrogas: {
+          orderBy: { solicitadaEn: 'desc' },
+          include: { solicitadaPor: { select: { nombre: true } }, resueltaPor: { select: { nombre: true } } },
+        },
       },
     });
 
@@ -222,6 +227,20 @@ export class ConsultaTareasService {
     const abierta = !ESTADOS_CERRADOS.includes(tarea.estado);
     const gestiona =
       usuario.permisos.has('tarea:crear') && (tarea.asignadoPorId === usuario.usuarioId || usuario.alcanceGlobal);
+    const evidenciasAdjuntas = tarea.avances.reduce((suma, avance) => suma + avance.evidencias.length, 0);
+    const estadoSeguimiento = evaluarSeguimiento(
+      {
+        estado: tarea.estado,
+        prioridad: tarea.prioridad,
+        fechaLimite: aFechaIso(tarea.fechaLimite),
+        estricto: tarea.seguimientoEstricto,
+        creadoEn: tarea.creadoEn,
+        recibidaEn: tarea.recibidaEn,
+        ultimoReporteEn: tarea.ultimoReporteEn,
+      },
+      new Date(),
+      hoy,
+    );
 
     return {
       ...aResumenTarea(tarea, hoy),
@@ -294,11 +313,73 @@ export class ConsultaTareasService {
         comentario: ronda.comentario,
         fecha: aIso(ronda.fecha),
       })),
-      evidenciasAdjuntas: tarea.avances.reduce((suma, avance) => suma + avance.evidencias.length, 0),
+      evidenciasAdjuntas,
+      seguimiento: {
+        estricto: tarea.seguimientoEstricto,
+        semaforo: estadoSeguimiento.semaforo,
+        recibidaEn: aIsoONulo(tarea.recibidaEn),
+        esperandoAcuse: estadoSeguimiento.esperandoAcuse,
+        sinAcuse: estadoSeguimiento.sinAcuse,
+        ultimoReporte: aIsoONulo(tarea.ultimoReporteEn),
+        limiteReporte: estadoSeguimiento.limiteReporte,
+        sinReporte: estadoSeguimiento.sinReporte,
+        rondasObservadas: tarea.rondas.filter(({ decision }) => decision === 'OBSERVADA').length,
+        pasos: armarPasos(
+          {
+            estado: tarea.estado,
+            estricto: tarea.seguimientoEstricto,
+            requiereAprobacion: tarea.requiereAprobacion,
+            creadoEn: tarea.creadoEn,
+            asignadoPor: tarea.asignadoPor.nombre,
+            recibidaEn: tarea.recibidaEn,
+            responsable: tarea.responsable.nombre,
+          },
+          tarea.transiciones.map((transicion) => ({
+            hacia: transicion.hacia,
+            fecha: transicion.fecha,
+            usuario: transicion.usuario.nombre,
+          })),
+          new Date(),
+        ),
+        prorrogas: tarea.prorrogas.map((prorroga) => ({
+          id: prorroga.id,
+          fechaAnterior: aFechaIso(prorroga.fechaAnterior),
+          fechaPropuesta: aFechaIso(prorroga.fechaPropuesta),
+          motivo: prorroga.motivo,
+          estado: prorroga.estado,
+          solicitadaPor: prorroga.solicitadaPor.nombre,
+          solicitadaEn: aIso(prorroga.solicitadaEn),
+          resueltaPor: prorroga.resueltaPor?.nombre ?? null,
+          resueltaEn: aIsoONulo(prorroga.resueltaEn),
+          respuesta: prorroga.respuesta,
+        })),
+        acciones: {
+          acusar: estadoSeguimiento.esperandoAcuse && tarea.responsableId === usuario.usuarioId,
+          solicitarProrroga:
+            tarea.seguimientoEstricto && abierta && ejecuta && !tarea.prorrogas.some(({ estado }) => estado === 'PENDIENTE'),
+          resolverProrroga:
+            tarea.prorrogas.some(({ estado }) => estado === 'PENDIENTE') &&
+            (tarea.asignadoPorId === usuario.usuarioId || usuario.alcanceGlobal),
+        },
+        requisitosEnvio: tarea.seguimientoEstricto
+          ? [
+              { texto: 'Avance al 100 %', cumplido: tarea.porcentajeAvance === 100 },
+              ...(tarea.items.length === 0
+                ? []
+                : [
+                    {
+                      texto: `Lista de verificación completa (${String(tarea.items.filter(({ completadoEn }) => completadoEn !== null).length)} de ${String(tarea.items.length)})`,
+                      cumplido: tarea.items.every(({ completadoEn }) => completadoEn !== null),
+                    },
+                  ]),
+              ...(tarea.requiereEvidencia ? [{ texto: 'Evidencia adjunta', cumplido: evidenciasAdjuntas > 0 }] : []),
+            ]
+          : [],
+      },
       acciones: {
         editar: abierta && gestiona,
-        iniciar: tarea.estado === 'PENDIENTE' && ejecuta,
-        registrarAvance: ESTADOS_CON_AVANCE.includes(tarea.estado) && ejecuta,
+        iniciar: tarea.estado === 'PENDIENTE' && ejecuta && !estadoSeguimiento.esperandoAcuse,
+        registrarAvance: ESTADOS_CON_AVANCE.includes(tarea.estado) && ejecuta && !estadoSeguimiento.esperandoAcuse,
         comentar: true,
         enviar: accionDeEnvio(tarea.estado) !== null && ejecuta,
         revisar:
