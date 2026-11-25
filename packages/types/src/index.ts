@@ -6,6 +6,7 @@ export * from './common';
 export * from './documents';
 export * from './finance';
 export * from './projects';
+export * from './uploads';
 export * from './health';
 export * from './identity-documents';
 export * from './incidents';
