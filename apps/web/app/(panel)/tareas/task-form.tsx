@@ -6,7 +6,7 @@ import { type ReactNode, useActionState, useState } from 'react';
 import { MensajeFormulario } from '@/components/form-message';
 import { BotonEnvio } from '@/components/submit-button';
 import { ESTADO_INICIAL, type EstadoFormulario } from '@/lib/form-state';
-import { formatearFecha } from '@/lib/format';
+import { formatearPlazo } from '@/lib/format';
 
 interface PropiedadesFormularioTarea {
   accion: (anterior: EstadoFormulario, datos: FormData) => Promise<EstadoFormulario>;
@@ -104,7 +104,7 @@ export function FormularioTarea({
             error={estado.errores.items}
           />
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Seleccion
             id="clienteId"
             name="clienteId"
@@ -133,7 +133,7 @@ export function FormularioTarea({
               </option>
             ))}
           </Seleccion>
-          <div className="grid grid-cols-2 gap-4 sm:col-span-1">
+          <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2 lg:grid-cols-4">
             <Campo
               id="fechaInicio"
               name="fechaInicio"
@@ -142,25 +142,46 @@ export function FormularioTarea({
               defaultValue={valor('fechaInicio', tarea?.fechaInicio) ?? fechaHoy}
               error={estado.errores.fechaInicio}
             />
+            <Campo
+              id="horaInicio"
+              name="horaInicio"
+              type="time"
+              etiqueta="Hora de inicio"
+              ayuda="Opcional."
+              defaultValue={valor('horaInicio', tarea?.horaInicio)}
+              error={estado.errores.horaInicio}
+            />
             {tarea?.seguimiento.estricto === true ? (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-tinta">Fecha límite</span>
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
+                <span className="text-sm font-medium text-tinta">Fecha y hora límite</span>
                 <input type="hidden" name="fechaLimite" value={tarea.fechaLimite} />
+                <input type="hidden" name="horaLimite" value={tarea.horaLimite ?? ''} />
                 <span className="flex h-11 items-center rounded-md border border-borde bg-fondo px-3 text-sm text-tinta">
-                  {formatearFecha(tarea.fechaLimite)}
+                  {formatearPlazo(tarea.fechaLimite, tarea.horaLimite)}
                 </span>
                 <span className="text-xs text-apagado">Solo cambia con una prórroga aprobada.</span>
               </div>
             ) : (
-              <Campo
-                id="fechaLimite"
-                name="fechaLimite"
-                type="date"
-                etiqueta="Fecha límite"
-                required
-                defaultValue={valor('fechaLimite', base?.fechaLimite)}
-                error={estado.errores.fechaLimite}
-              />
+              <>
+                <Campo
+                  id="fechaLimite"
+                  name="fechaLimite"
+                  type="date"
+                  etiqueta="Fecha límite"
+                  required
+                  defaultValue={valor('fechaLimite', base?.fechaLimite)}
+                  error={estado.errores.fechaLimite}
+                />
+                <Campo
+                  id="horaLimite"
+                  name="horaLimite"
+                  type="time"
+                  etiqueta="Hora límite"
+                  ayuda="Opcional. Sin hora, vence al final del día."
+                  defaultValue={valor('horaLimite', tarea?.horaLimite)}
+                  error={estado.errores.horaLimite}
+                />
+              </>
             )}
           </div>
         </div>
