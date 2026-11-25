@@ -14,6 +14,7 @@ interface PropiedadesFormularioTarea {
   fechaHoy: string;
   clienteInicial: string | null;
   plantilla?: Plantilla | null;
+  etapaId?: string | null;
 }
 
 function sumarDias(fecha: string, dias: number): string {
@@ -29,7 +30,9 @@ export function FormularioTarea({
   fechaHoy,
   clienteInicial,
   plantilla = null,
+  etapaId = null,
 }: PropiedadesFormularioTarea): ReactNode {
+  const etapaVinculada = tarea?.etapa?.id ?? etapaId;
   const [estado, accionFormulario] = useActionState(accion, ESTADO_INICIAL);
   const [responsableId, setResponsableId] = useState(tarea?.responsable.id ?? '');
   const [colaboradorIds, setColaboradorIds] = useState<string[]>(
@@ -65,6 +68,7 @@ export function FormularioTarea({
       <MensajeFormulario estado={estado} />
       {tarea === null ? null : <input type="hidden" name="version" value={tarea.version} />}
       {tarea === null && plantilla !== null ? <input type="hidden" name="plantillaId" value={plantilla.id} /> : null}
+      {etapaVinculada === null ? null : <input type="hidden" name="etapaId" value={etapaVinculada} />}
 
       <fieldset className="grid gap-4">
         <legend className="mb-2 text-base font-semibold text-marino">Qué hay que hacer</legend>
