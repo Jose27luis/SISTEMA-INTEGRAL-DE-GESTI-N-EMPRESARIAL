@@ -74,15 +74,23 @@ const esquemaBaseTarea = z.object({
 type BaseTarea = z.infer<typeof esquemaBaseTarea>;
 
 function validarReglasTarea(tarea: BaseTarea, contexto: z.RefinementCtx): void {
+  validarReglasComunes(tarea, [tarea.responsableId], contexto);
+}
+
+function validarReglasComunes(
+  tarea: Omit<BaseTarea, 'responsableId'>,
+  responsables: readonly string[],
+  contexto: z.RefinementCtx,
+): void {
   if (tarea.requiereAprobacion && tarea.revisorId === null) {
     contexto.addIssue({ code: 'custom', path: ['revisorId'], message: 'Seleccione quién revisará el trabajo.' });
   }
 
-  if (tarea.revisorId !== null && tarea.revisorId === tarea.responsableId) {
+  if (tarea.revisorId !== null && responsables.includes(tarea.revisorId)) {
     contexto.addIssue({
       code: 'custom',
       path: ['revisorId'],
-      message: 'El revisor debe ser distinto del responsable.',
+      message: responsables.length > 1 ? 'El revisor no puede ser uno de los responsables.' : 'El revisor debe ser distinto del responsable.',
     });
   }
 
@@ -104,6 +112,47 @@ function validarReglasTarea(tarea: BaseTarea, contexto: z.RefinementCtx): void {
 }
 
 export const esquemaTareaEntrada = esquemaBaseTarea.superRefine(validarReglasTarea);
+
+export const MAXIMO_RESPONSABLES_LOTE = 20;
+
+export const esquemaAsignacionMasiva = esquemaBaseTarea
+  .omit({ responsableId: true })
+  .extend({
+    responsableIds: z
+      .array(z.uuid())
+      .min(2, 'Elija al menos dos responsables para asignar a varias personas.')
+      .max(MAXIMO_RESPONSABLES_LOTE, `Máximo ${String(MAXIMO_RESPONSABLES_LOTE)} responsables por asignación.`)
+      .refine((ids) => new Set(ids).size === ids.length, 'Hay responsables repetidos.'),
+  })
+  .superRefine((tarea, contexto) => {
+    validarReglasComunes(tarea, tarea.responsableIds, contexto);
+  });
+export type AsignacionMasiva = z.infer<typeof esquemaAsignacionMasiva>;
+
+export const esquemaResultadoAsignacionMasiva = z.object({
+  tareas: z.array(z.object({ id: z.uuid(), codigo: z.string(), responsable: z.string() })),
+});
+export type ResultadoAsignacionMasiva = z.infer<typeof esquemaResultadoAsignacionMasiva>;
+
+export const DIAS_CALENDARIO_CARGA = 120;
+
+export const esquemaCargaPersona = z.object({
+  id: z.uuid(),
+  nombre: z.string(),
+  abiertas: z.number().int().nonnegative(),
+  vencidas: z.number().int().nonnegative(),
+  porVencer: z.number().int().nonnegative(),
+  urgentes: z.number().int().nonnegative(),
+  porConfirmar: z.number().int().nonnegative(),
+  vencimientos: z.array(z.object({ fecha: z.iso.date(), cantidad: z.number().int().positive() })),
+});
+export type CargaPersona = z.infer<typeof esquemaCargaPersona>;
+
+export const esquemaCargaEquipo = z.object({
+  hoy: z.iso.date(),
+  personas: z.array(esquemaCargaPersona),
+});
+export type CargaEquipo = z.infer<typeof esquemaCargaEquipo>;
 
 export const esquemaEdicionTarea = esquemaBaseTarea
   .extend({ version: z.coerce.number().int().positive() })
