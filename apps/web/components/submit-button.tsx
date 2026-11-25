@@ -9,6 +9,7 @@ interface PropiedadesBotonEnvio {
   textoPendiente: string;
   variante?: VarianteBoton;
   className?: string;
+  disabled?: boolean;
 }
 
 export function BotonEnvio({
@@ -16,11 +17,12 @@ export function BotonEnvio({
   textoPendiente,
   variante = 'primario',
   className,
+  disabled = false,
 }: PropiedadesBotonEnvio): ReactNode {
   const { pending } = useFormStatus();
 
   return (
-    <Boton type="submit" variante={variante} disabled={pending} aria-busy={pending} className={className}>
+    <Boton type="submit" variante={variante} disabled={pending || disabled} aria-busy={pending} className={className}>
       {pending ? textoPendiente : children}
     </Boton>
   );
