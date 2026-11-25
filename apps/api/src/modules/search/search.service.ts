@@ -4,6 +4,7 @@ import type { UsuarioAutenticado } from '../../common/auth/authenticated-request
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccesoClientesService } from '../clients/client-access.service';
 import { filtroDocumentosVisibles } from '../documents/document-visibility';
+import { filtroProyectosVisibles } from '../projects/project-visibility';
 import { AccesoTareasService } from '../tasks/task-access.service';
 
 const CANDIDATOS = 200;
@@ -23,13 +24,36 @@ export class BusquedaService {
 
   async buscar(consulta: string, usuario: UsuarioAutenticado): Promise<ResultadosBusqueda> {
     const patron = patronBusqueda(consulta);
-    const [clientes, tareas, documentos] = await Promise.all([
+    const [clientes, tareas, documentos, proyectos] = await Promise.all([
       usuario.permisos.has('cliente:ver') ? this.buscarClientes(patron, usuario) : Promise.resolve([]),
       usuario.permisos.has('tarea:ver') ? this.buscarTareas(patron, usuario) : Promise.resolve([]),
       usuario.permisos.has('documento:ver') ? this.buscarDocumentos(patron, usuario) : Promise.resolve([]),
+      usuario.permisos.has('proyecto:ver') ? this.buscarProyectos(patron, usuario) : Promise.resolve([]),
     ]);
 
-    return { consulta, clientes, tareas, documentos };
+    return { consulta, clientes, tareas, documentos, proyectos };
+  }
+
+  private async buscarProyectos(patron: string, usuario: UsuarioAutenticado): Promise<ResultadosBusqueda['proyectos']> {
+    const candidatos = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM proyectos
+      WHERE unaccent(lower(nombre)) LIKE unaccent(lower(${patron}))
+         OR lower(codigo) LIKE lower(${patron})
+      ORDER BY creado_en DESC
+      LIMIT ${CANDIDATOS}`;
+    const proyectos = await this.prisma.proyecto.findMany({
+      where: { AND: [{ id: { in: candidatos.map(({ id }) => id) } }, filtroProyectosVisibles(usuario)] },
+      orderBy: { creadoEn: 'desc' },
+      take: RESULTADOS_POR_GRUPO,
+      select: { id: true, codigo: true, nombre: true, cliente: { select: { razonSocial: true } } },
+    });
+
+    return proyectos.map((proyecto) => ({
+      id: proyecto.id,
+      codigo: proyecto.codigo,
+      nombre: proyecto.nombre,
+      cliente: proyecto.cliente?.razonSocial ?? null,
+    }));
   }
 
   private async buscarClientes(patron: string, usuario: UsuarioAutenticado): Promise<ResultadosBusqueda['clientes']> {
