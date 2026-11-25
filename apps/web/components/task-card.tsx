@@ -1,5 +1,6 @@
 import type { TareaResumen } from '@sige/types';
 import { cn } from '@sige/ui/cn';
+import { Insignia } from '@sige/ui/components';
 import { CalendarClock } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -17,7 +18,8 @@ export function TarjetaTarea({ tarea, mostrarEstado = true }: PropiedadesTarjeta
       href={`/tareas/${tarea.id}`}
       className={cn(
         'flex flex-col gap-3 rounded-lg border border-borde bg-superficie p-4 transition-colors hover:border-marino-claro',
-        tarea.atrasada && 'border-l-4 border-l-rojo',
+        tarea.semaforo === 'VENCIDA' && 'border-l-4 border-l-rojo',
+        tarea.semaforo === 'POR_VENCER' && 'border-l-4 border-l-dorado',
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -44,6 +46,16 @@ export function TarjetaTarea({ tarea, mostrarEstado = true }: PropiedadesTarjeta
         </span>
         {mostrarEstado ? <EstadoTareaInsignia estado={tarea.estado} /> : null}
       </div>
+      {tarea.esperandoAcuse || tarea.sinReporte ? (
+        <div className="flex flex-wrap gap-2">
+          {tarea.esperandoAcuse ? (
+            <Insignia tono={tarea.sinAcuse ? 'peligro' : 'aviso'}>
+              {tarea.sinAcuse ? 'Sin acuse +24 h' : 'Por confirmar recepción'}
+            </Insignia>
+          ) : null}
+          {tarea.sinReporte ? <Insignia tono="peligro">Sin reporte</Insignia> : null}
+        </div>
+      ) : null}
     </Link>
   );
 }
