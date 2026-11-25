@@ -34,8 +34,8 @@ export default async function PaginaBusqueda({ searchParams }: PropiedadesPagina
     return <Alerta tono="error">{resultado.error.mensaje}</Alerta>;
   }
 
-  const { clientes, tareas, documentos } = resultado.datos;
-  const total = clientes.length + tareas.length + documentos.length;
+  const { clientes, tareas, documentos, proyectos } = resultado.datos;
+  const total = clientes.length + tareas.length + documentos.length + proyectos.length;
 
   return (
     <>
@@ -43,7 +43,7 @@ export default async function PaginaBusqueda({ searchParams }: PropiedadesPagina
         titulo={`Resultados para «${entrada.data.q}»`}
         descripcion={total === 0 ? 'Sin coincidencias dentro de lo que puede ver.' : 'Solo se muestra lo que tiene permitido ver.'}
       />
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
         <Tarjeta titulo={`Clientes (${String(clientes.length)})`}>
           {clientes.length === 0 ? (
             <p className="text-sm text-apagado">Ninguno.</p>
@@ -89,6 +89,22 @@ export default async function PaginaBusqueda({ searchParams }: PropiedadesPagina
                   <p className="text-xs text-apagado">
                     {documento.tipo} · {documento.cliente ?? 'Documento interno'}
                   </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Tarjeta>
+        <Tarjeta titulo={`Proyectos (${String(proyectos.length)})`}>
+          {proyectos.length === 0 ? (
+            <p className="text-sm text-apagado">Ninguno.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-borde">
+              {proyectos.map((proyecto) => (
+                <li key={proyecto.id} className="py-2 text-sm">
+                  <Link href={`/proyectos/${proyecto.id}`} className="font-semibold text-marino hover:underline">
+                    {proyecto.codigo} · {proyecto.nombre}
+                  </Link>
+                  <p className="text-xs text-apagado">{proyecto.cliente ?? 'Proyecto interno'}</p>
                 </li>
               ))}
             </ul>
