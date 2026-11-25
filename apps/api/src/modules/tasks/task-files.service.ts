@@ -306,6 +306,25 @@ export class ArchivosTareaService {
     });
   }
 
+  private async primeraTareaVisible(
+    tareaIds: readonly string[],
+    usuario: UsuarioAutenticado,
+    contexto: ContextoCliente,
+  ): Promise<string> {
+    let ultimoError: unknown = null;
+
+    for (const id of tareaIds) {
+      try {
+        await this.acceso.obtenerVisible(usuario, id, contexto);
+        return id;
+      } catch (error) {
+        ultimoError = error;
+      }
+    }
+
+    throw ultimoError;
+  }
+
   private async autorizar(archivoId: string, usuario: UsuarioAutenticado, contexto: ContextoCliente): Promise<ArchivoAutorizado> {
     const archivo = await this.prisma.archivo.findUnique({
       where: { id: archivoId },
@@ -313,6 +332,7 @@ export class ArchivosTareaService {
         subidoPor: { select: { nombre: true } },
         vistaPrevia: true,
         evidencias: { take: 1, select: { avance: { select: { tareaId: true } } } },
+        adjuntosTarea: { select: { tareaId: true } },
         versiones: { take: 1, select: { documentoId: true, numero: true } },
         vouchers: { take: 1, select: { id: true } },
         comprobantesEgreso: { take: 1, select: { id: true } },
@@ -324,7 +344,13 @@ export class ArchivosTareaService {
       throw new NotFoundException({ mensaje: 'El archivo no existe.', errores: [] });
     }
 
-    const tareaId = archivo.evidencias[0]?.avance.tareaId;
+    const tareaIds = [
+      ...new Set([
+        ...archivo.evidencias.map(({ avance }) => avance.tareaId),
+        ...archivo.adjuntosTarea.map(({ tareaId: id }) => id),
+      ]),
+    ];
+    let tareaId: string | undefined = tareaIds[0];
     const version = archivo.versiones[0];
     const financiero = archivo.vouchers.length > 0 || archivo.comprobantesEgreso.length > 0;
     const proyectoId = archivo.entregables[0]?.etapa.proyectoId;
@@ -376,7 +402,7 @@ export class ArchivosTareaService {
         throw new ForbiddenException({ mensaje: 'No tiene acceso a este archivo.', errores: [] });
       }
     } else {
-      await this.acceso.obtenerVisible(usuario, tareaId, contexto);
+      tareaId = await this.primeraTareaVisible(tareaIds, usuario, contexto);
     }
 
     return { ...archivo, tareaId: tareaId ?? null, documentoId: version?.documentoId ?? null, version: version?.numero ?? null };
