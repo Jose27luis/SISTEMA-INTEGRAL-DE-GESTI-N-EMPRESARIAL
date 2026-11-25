@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { estaAtrasada, type TareaResumen } from '@sige/types';
-import { aFechaIso, aFechaIsoONula } from '../../common/dates';
+import { aFechaIso, aFechaIsoONula, horaEnLima } from '../../common/dates';
 import { evaluarSeguimiento } from './task-tracking-rules';
 
 export const INCLUSION_RESUMEN_TAREA = {
@@ -17,6 +17,7 @@ export function aResumenTarea(tarea: TareaConResumen, hoy: string, ahora: Date =
       estado: tarea.estado,
       prioridad: tarea.prioridad,
       fechaLimite,
+      horaLimite: tarea.horaLimite,
       estricto: tarea.seguimientoEstricto,
       creadoEn: tarea.creadoEn,
       recibidaEn: tarea.recibidaEn,
@@ -33,11 +34,13 @@ export function aResumenTarea(tarea: TareaConResumen, hoy: string, ahora: Date =
     estado: tarea.estado,
     prioridad: tarea.prioridad,
     fechaInicio: aFechaIsoONula(tarea.fechaInicio),
+    horaInicio: tarea.horaInicio,
     fechaLimite,
+    horaLimite: tarea.horaLimite,
     cliente: tarea.cliente === null ? null : { id: tarea.cliente.id, nombre: tarea.cliente.razonSocial },
     responsable: tarea.responsable,
     porcentajeAvance: tarea.porcentajeAvance,
-    atrasada: estaAtrasada(tarea.estado, fechaLimite, hoy),
+    atrasada: estaAtrasada(tarea.estado, fechaLimite, hoy, tarea.horaLimite, horaEnLima(ahora)),
     semaforo: seguimiento.semaforo,
     esperandoAcuse: seguimiento.esperandoAcuse,
     sinAcuse: seguimiento.sinAcuse,
