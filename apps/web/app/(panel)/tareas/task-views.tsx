@@ -37,6 +37,7 @@ export function VistaLista({ tareas }: { tareas: TareaResumen[] }): ReactNode {
               <td className="py-3 pr-4">{tarea.responsable.nombre}</td>
               <td className={cn('py-3 pr-4 whitespace-nowrap', tarea.atrasada && 'font-semibold text-rojo')}>
                 {formatearFecha(tarea.fechaLimite)}
+                {tarea.horaLimite === null ? null : <span className="block text-xs">{tarea.horaLimite}</span>}
                 {tarea.atrasada ? <span className="block text-xs">Atrasada</span> : null}
               </td>
               <td className="py-3 pr-4">
