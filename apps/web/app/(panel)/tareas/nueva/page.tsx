@@ -1,4 +1,4 @@
-import { esquemaOpcionesTarea, esquemaPlantilla } from '@sige/types';
+import { esquemaOpcionesTarea, esquemaPlantilla, esquemaProyectoDetalle } from '@sige/types';
 import { cn } from '@sige/ui/cn';
 import { Alerta, Tarjeta } from '@sige/ui/components';
 import type { Metadata } from 'next';
@@ -33,10 +33,17 @@ export default async function PaginaNuevaTarea({ searchParams }: PropiedadesPagi
   const crudos = await searchParams;
   const clienteInicial = z.uuid().safeParse(primerValor(crudos.cliente));
   const plantillaId = primerValor(crudos.plantilla);
-  const [opciones, plantillas] = await Promise.all([
+  const proyectoId = z.uuid().safeParse(primerValor(crudos.proyecto));
+  const etapaId = primerValor(crudos.etapa);
+  const [opciones, plantillas, proyecto] = await Promise.all([
     solicitarApi('/tareas/opciones', { esquema: esquemaOpcionesTarea }),
     solicitarApi('/plantillas', { esquema: esquemaPlantilla.array() }),
+    proyectoId.success
+      ? solicitarApi(`/proyectos/${proyectoId.data}`, { esquema: esquemaProyectoDetalle })
+      : Promise.resolve(null),
   ]);
+  const etapa = proyecto?.ok === true ? (proyecto.datos.etapas.find(({ id }) => id === etapaId) ?? null) : null;
+  const clienteDelProyecto = proyecto?.ok === true && etapa !== null ? (proyecto.datos.cliente?.id ?? null) : undefined;
   const disponibles = plantillas.ok ? plantillas.datos : [];
   const plantilla = disponibles.find(({ id }) => id === plantillaId) ?? null;
   const enlacePlantilla = (id: string | null): string => {
@@ -44,6 +51,11 @@ export default async function PaginaNuevaTarea({ searchParams }: PropiedadesPagi
 
     if (clienteInicial.success) {
       consulta.set('cliente', clienteInicial.data);
+    }
+
+    if (proyectoId.success && etapa !== null) {
+      consulta.set('proyecto', proyectoId.data);
+      consulta.set('etapa', etapa.id);
     }
 
     if (id !== null) {
@@ -65,6 +77,12 @@ export default async function PaginaNuevaTarea({ searchParams }: PropiedadesPagi
         descripcion="El responsable y los colaboradores reciben una notificación al guardarla."
       />
       <div className="flex flex-col gap-6">
+        {proyecto?.ok === true && etapa !== null ? (
+          <Alerta tono="info" titulo={`Proyecto ${proyecto.datos.codigo} · ${proyecto.datos.nombre}`}>
+            La tarea se agregará a la etapa «{etapa.nombre}». El responsable debe ser parte del equipo del proyecto
+            {proyecto.datos.cliente === null ? '.' : ` y la tarea queda para ${proyecto.datos.cliente.razonSocial}.`}
+          </Alerta>
+        ) : null}
         {disponibles.length > 0 ? (
           <Tarjeta
             titulo="Empezar desde una plantilla"
@@ -107,8 +125,9 @@ export default async function PaginaNuevaTarea({ searchParams }: PropiedadesPagi
               opciones={opciones.datos}
               tarea={null}
               fechaHoy={fechaHoyEnLima()}
-              clienteInicial={clienteInicial.success ? clienteInicial.data : null}
+              clienteInicial={clienteDelProyecto !== undefined ? clienteDelProyecto : clienteInicial.success ? clienteInicial.data : null}
               plantilla={plantilla}
+              etapaId={etapa?.id ?? null}
             />
           </Tarjeta>
         ) : (
