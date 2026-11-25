@@ -3936,6 +3936,92 @@ El periodo de los indicadores no puede superar un año, y la fecha final no pued
 | Retirar etapas o entregables | No se borran; una etapa se marca como completada. |
 | Entregables vinculados al expediente documental | El archivo queda en el almacenamiento del cliente y se descarga desde el proyecto. Para el expediente, súbalo también en Documentos. |
 
+### 12.17 Tareas a medida, parte A: archivos rápidos y visor
+
+Primera de tres partes del rediseño de tareas pedido por Gerencia:
+
+- **A:** archivos rápidos y visor.
+- **B:** seguimiento estricto con barra de estados.
+- **C:** creación interactiva.
+
+**Decisiones de Gerencia** (2026-11-25):
+
+| Tema | Decisión |
+|---|---|
+| Acuse de recibo | Estado **Recibida**; si el responsable no confirma en 24 horas, se avisa a quien asignó (parte B). |
+| Fecha límite | Solo por **prórroga solicitada** con motivo y aprobada por quien asignó (parte B). |
+| Sin reporte | Según prioridad: urgente 1 día hábil, alta 2, media 3 y baja 5 (parte B). |
+| Archivos | Hasta **200 MB** por archivo, con vista previa de Word, Excel y PowerPoint dentro del sistema. |
+
+**Cómo viaja un archivo:**
+
+1. **Subida en segundo plano:** apenas el usuario suelta el archivo en la zona de arrastre, el navegador lo sube en partes de 5 MB, mientras sigue llenando el formulario.
+   - Rutas: `POST /subidas`, `PUT /subidas/:id/partes?desde=N` y `POST /subidas/:id/finalizar`.
+   - Cada parte se escribe directo al disco; ni la web ni la API cargan el archivo completo en memoria.
+   - Si la conexión se corta, se consulta `GET /subidas/:id` y se continúa desde el último byte recibido, con hasta 5 reintentos.
+2. **Finalizar:**
+   - Se verifica el tipo por el contenido: un ejecutable renombrado como `.pdf` se rechaza.
+   - Se calcula la huella SHA-256 y el archivo pasa al almacén.
+3. **Adjuntar:** el formulario envía solo los identificadores de las subidas. Al guardar, la API las convierte en archivos dentro de la misma transacción, y una subida no puede adjuntarse dos veces ni por otro usuario.
+4. **Limpieza:** las subidas que no se adjuntan en 24 horas se marcan como vencidas y se borra su archivo del disco. El registro en la base se conserva.
+
+**Descargas:** `GET /archivos/:id` responde con:
+
+- **Rangos (206):** para reanudar descargas y para que el visor de PDF pida solo las páginas que necesita.
+- **Huella (`ETag`):** si el archivo no cambió, el navegador lo reutiliza (304).
+- **Auditoría:** solo la primera parte de cada descarga se registra.
+
+**En producción**, nginx envía `/subidas/…` y `/archivos/…` directo a la API, sin pasar por la web. Toma la sesión de la cookie y no guarda en búfer ni subidas ni descargas.
+
+- La web conserva rutas equivalentes, que reenvían el flujo sin cargarlo en memoria, para desarrollo y como respaldo.
+- Las subidas exigen la cabecera `X-Sige-Subida: 1`; junto con la cookie `SameSite=Lax`, eso impide que otro sitio suba archivos con la sesión del usuario.
+
+**Formatos:** PDF, Word (`doc`, `docx`), Excel (`xls`, `xlsx`), PowerPoint (`ppt`, `pptx`), CSV, TXT, imágenes (PNG, JPG, WEBP) y ZIP. Hasta 200 MB cada uno y 10 por avance.
+
+**Vista previa:**
+
+- **Servicio `conversor`:** Gotenberg 8.15.3 con LibreOffice, interno, sin puertos publicados y con 1,5 GB de memoria.
+- **Conversión:** cada 20 segundos el worker toma los archivos Office pendientes, los convierte a PDF y lo guarda aparte. Los registra en la tabla `vistas_previas` (pendiente, procesando, lista, error o no aplica), con hasta 3 intentos.
+- **Archivos anteriores:** la migración encoló también los archivos Office que ya existían.
+
+**Visor** (al tocar cualquier evidencia de una tarea): un panel a pantalla completa con:
+
+- **PDF y documentos convertidos:**
+  - pdf.js dibuja solo las páginas visibles.
+  - Al costado hay miniaturas para saltar de página.
+  - Tiene zoom, «Ajustar al ancho», un número de página editable y botones para pasar de página.
+- **Excel y CSV:**
+  - Vista de **tabla** con letras de columna, números de fila y pestañas por hoja (hasta 500 filas y 40 columnas).
+  - Vista de **impresión** con el PDF convertido.
+- **Imágenes** con zoom y **texto** plano.
+- **ZIP y formatos sin vista:** muestra el aviso y la descarga.
+- Mientras se convierte un Office, muestra «Preparando la vista previa» y se actualiza solo al terminar.
+- **Siempre visibles:** «Descargar», «Pestaña nueva» (PDF e imágenes) y la tecla Escape para cerrar.
+
+**Modelo de datos** (migración `20261201120000_subidas_y_vistas_previas`):
+
+- **`subidas`:** usuario, nombre, tamaño, bytes recibidos, estado (en curso, completa, usada o vencida), rutas, tipo, huella, archivo resultante y vencimiento.
+  - Restricciones (CHECK): tamaño máximo de 200 MB, bytes recibidos dentro del tamaño, y una subida completa o usada debe tener todos sus datos.
+- **`vistas_previas`:** archivo, estado, PDF generado, intentos y error.
+
+**Verificación realizada:** typecheck, lint, pruebas unitarias (3 nuevas de detección de tipos) y build. Contra un stack desechable con el conversor real:
+
+- **Protocolo de subida:**
+  - Se rechazaron la falta de cabecera (403), un `.exe`, 201 MB y la escritura de otra persona en la subida (403).
+  - Un «desde» equivocado devolvió 409 con el punto de reanudación, y una parte de 6 MB devolvió 413.
+  - Se reanudó tras el corte, «finalizar» con partes faltantes devolvió 409, y un ejecutable renombrado `.pdf` se rechazó y quedó vencido.
+- **Navegador:**
+  - Excel, CSV, PDF y un ZIP de 30 MB subieron con barra de progreso, y el envío del avance quedó bloqueado mientras subían.
+  - El avance se guardó con las 4 evidencias.
+  - El visor mostró el PDF (3 páginas, miniaturas y zoom), el Excel en tabla con sus dos hojas y luego convertido a PDF, el CSV con tildes y punto y coma, y el ZIP sin vista previa.
+  - Todo sin errores de consola, en 1440 px y en 390 px.
+- **Velocidad** en el servidor:
+  - Subida de 30 MB en unos 0,7 s directo a la API y 0,9 s pasando por la web.
+  - Descarga de 30 MB en 0,4 a 0,6 s.
+  - Por rango respondió 206 y por revalidación 304.
+
+**Pendiente:** llevar el cargador y el visor a documentos, entregables, vouchers y constancias, que hoy siguen con su formulario anterior de hasta 24 MB.
+
 ---
 
 ## Licencia y titularidad
