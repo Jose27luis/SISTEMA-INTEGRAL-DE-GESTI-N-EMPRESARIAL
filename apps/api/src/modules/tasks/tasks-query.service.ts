@@ -193,6 +193,7 @@ export class ConsultaTareasService {
         rondas: { orderBy: { numero: 'desc' }, include: { revisor: { select: { id: true, nombre: true } } } },
         obligacion: { select: { id: true } },
         plantilla: { select: { id: true, nombre: true } },
+        etapa: { select: { id: true, nombre: true, proyecto: { select: { id: true, codigo: true, nombre: true } } } },
         items: { orderBy: { orden: 'asc' }, include: { completadoPor: { select: { nombre: true } } } },
       },
     });
@@ -236,6 +237,7 @@ export class ConsultaTareasService {
       creadoEn: aIso(tarea.creadoEn),
       obligacionId: tarea.obligacion?.id ?? null,
       plantilla: tarea.plantilla,
+      etapa: tarea.etapa,
       items: tarea.items.map((item) => ({
         id: item.id,
         texto: item.texto,
