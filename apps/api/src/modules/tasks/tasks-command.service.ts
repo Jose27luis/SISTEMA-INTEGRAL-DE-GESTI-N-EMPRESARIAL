@@ -12,7 +12,7 @@ import {
   type TareaEntrada,
 } from '@sige/types';
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
-import { aFechaDb, aFechaIso, formatearFechaPeruana } from '../../common/dates';
+import { aFechaDb, aFechaIso, formatearPlazoPeruano } from '../../common/dates';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PermisosEfectivosService } from '../access-control/effective-permissions.service';
 import { actorDesde, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
@@ -28,7 +28,9 @@ function datosTarea(entrada: TareaEntrada): {
   revisorId: string | null;
   prioridad: TareaEntrada['prioridad'];
   fechaInicio: Date | null;
+  horaInicio: string | null;
   fechaLimite: Date;
+  horaLimite: string | null;
   requiereAprobacion: boolean;
   requiereEvidencia: boolean;
   evidenciaRequerida: string | null;
@@ -43,7 +45,9 @@ function datosTarea(entrada: TareaEntrada): {
     revisorId: entrada.revisorId,
     prioridad: entrada.prioridad,
     fechaInicio: entrada.fechaInicio === null ? null : aFechaDb(entrada.fechaInicio),
+    horaInicio: entrada.fechaInicio === null ? null : entrada.horaInicio,
     fechaLimite: aFechaDb(entrada.fechaLimite),
+    horaLimite: entrada.horaLimite,
     requiereAprobacion: entrada.requiereAprobacion,
     requiereEvidencia: entrada.requiereEvidencia,
     evidenciaRequerida: entrada.requiereEvidencia ? entrada.evidenciaRequerida : null,
@@ -162,7 +166,7 @@ export class GestionTareasService {
     );
 
     const enlace = `/tareas/${tarea.id}`;
-    const mensaje = `${codigo} · Prioridad ${ETIQUETAS_PRIORIDAD[entrada.prioridad].toLowerCase()} · Vence el ${formatearFechaPeruana(entrada.fechaLimite)}`;
+    const mensaje = `${codigo} · Prioridad ${ETIQUETAS_PRIORIDAD[entrada.prioridad].toLowerCase()} · Vence el ${formatearPlazoPeruano(entrada.fechaLimite, entrada.horaLimite)}`;
 
     notificados.push(
       ...(await this.notificaciones.crear(
@@ -222,9 +226,12 @@ export class GestionTareasService {
       });
     }
 
-    if (anterior.seguimientoEstricto && aFechaIso(anterior.fechaLimite) !== entrada.fechaLimite) {
+    if (
+      anterior.seguimientoEstricto &&
+      (aFechaIso(anterior.fechaLimite) !== entrada.fechaLimite || anterior.horaLimite !== entrada.horaLimite)
+    ) {
       throw new BadRequestException({
-        mensaje: 'La fecha límite no se edita directamente.',
+        mensaje: 'La fecha y hora límite no se editan directamente.',
         errores: [{ campo: 'fechaLimite', mensaje: 'El responsable debe pedir una prórroga y usted aprobarla.' }],
       });
     }
@@ -274,6 +281,7 @@ export class GestionTareasService {
             revisorId: anterior.revisorId,
             prioridad: anterior.prioridad,
             fechaLimite: anterior.fechaLimite.toISOString().slice(0, 10),
+            horaLimite: anterior.horaLimite,
             colaboradorIds: anteriores,
           },
           despues: { ...entrada, colaboradorIds },
@@ -308,7 +316,7 @@ export class GestionTareasService {
               destinatarios: [entrada.responsableId],
               tipo: 'TAREA_REASIGNADA',
               titulo: `Ahora es responsable de: ${entrada.titulo}`,
-              mensaje: `${anterior.codigo} · Vence el ${formatearFechaPeruana(entrada.fechaLimite)}`,
+              mensaje: `${anterior.codigo} · Vence el ${formatearPlazoPeruano(entrada.fechaLimite, entrada.horaLimite)}`,
               enlace,
               entidad: 'tarea',
               entidadId: id,
