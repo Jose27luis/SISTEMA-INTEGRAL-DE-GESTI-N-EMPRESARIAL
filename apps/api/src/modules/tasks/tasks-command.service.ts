@@ -18,9 +18,12 @@ import { PermisosEfectivosService } from '../access-control/effective-permission
 import { actorDesde, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
 import { NotificacionesService } from '../notifications/notifications.service';
 import { AccesoTareasService } from './task-access.service';
+import { SubidasService } from '../uploads/uploads.service';
 import { generarCodigoTarea } from './task-code';
 
-function datosTarea(entrada: TareaEntrada): {
+type DatosTarea = Omit<TareaEntrada, 'subidaIds'>;
+
+function datosTarea(entrada: DatosTarea): {
   titulo: string;
   instrucciones: string | null;
   clienteId: string | null;
@@ -62,12 +65,16 @@ export class GestionTareasService {
     private readonly auditoria: AuditoriaService,
     private readonly notificaciones: NotificacionesService,
     private readonly permisos: PermisosEfectivosService,
+    private readonly subidas: SubidasService,
   ) {}
 
   async crear(entrada: TareaEntrada, usuario: UsuarioAutenticado, contexto: ContextoCliente): Promise<string> {
     await this.validar(entrada, usuario, this.prisma);
 
-    const creada = await this.prisma.$transaction((tx) => this.crearEn(tx, entrada, usuario, contexto));
+    const creada = await this.prisma.$transaction(async (tx) => {
+      const archivos = await this.subidas.consumir(tx, entrada.subidaIds, usuario.usuarioId, entrada.clienteId);
+      return this.crearEn(tx, entrada, usuario, contexto, archivos.map(({ id }) => id));
+    });
 
     await this.notificaciones.publicar(creada.notificados);
     return creada.id;
@@ -92,9 +99,11 @@ export class GestionTareasService {
     const creadas = await this.prisma.$transaction(
       async (tx) => {
         const resultado: { id: string; codigo: string; notificados: string[] }[] = [];
+        const archivos = await this.subidas.consumir(tx, base.subidaIds, usuario.usuarioId, base.clienteId);
+        const archivoIds = archivos.map(({ id }) => id);
 
         for (const individual of entradas) {
-          resultado.push(await this.crearEn(tx, individual, usuario, contexto));
+          resultado.push(await this.crearEn(tx, individual, usuario, contexto, archivoIds));
         }
 
         return resultado;
@@ -124,6 +133,7 @@ export class GestionTareasService {
     entrada: TareaEntrada,
     usuario: UsuarioAutenticado,
     contexto: ContextoCliente,
+    archivoIds: readonly string[],
   ): Promise<{ id: string; codigo: string; notificados: string[] }> {
     const colaboradorIds = [...new Set(entrada.colaboradorIds)].filter((id) => id !== entrada.responsableId);
     const notificados: string[] = [];
@@ -150,6 +160,12 @@ export class GestionTareasService {
       });
     }
 
+    if (archivoIds.length > 0) {
+      await tx.adjuntoTarea.createMany({
+        data: archivoIds.map((archivoId) => ({ tareaId: tarea.id, archivoId, agregadoPorId: usuario.usuarioId })),
+      });
+    }
+
     await tx.transicionTarea.create({
       data: { tareaId: tarea.id, hacia: 'PENDIENTE', usuarioId: usuario.usuarioId, comentario: 'Tarea asignada' },
     });
@@ -160,7 +176,7 @@ export class GestionTareasService {
         accion: 'CREAR',
         entidad: 'tarea',
         entidadId: tarea.id,
-        despues: { codigo, ...entrada, colaboradorIds },
+        despues: { codigo, ...entrada, colaboradorIds, archivoIds },
       },
       tx,
     );
@@ -419,7 +435,7 @@ export class GestionTareasService {
     return destino;
   }
 
-  private async validarEtapa(entrada: TareaEntrada, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
+  private async validarEtapa(entrada: DatosTarea, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
     const etapa = await db.etapaProyecto.findUnique({
       where: { id: entrada.etapaId ?? '' },
       select: {
@@ -460,7 +476,7 @@ export class GestionTareasService {
     }
   }
 
-  private async validar(entrada: TareaEntrada, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
+  private async validar(entrada: DatosTarea, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
     if (entrada.plantillaId !== null) {
       const plantilla = await db.plantillaTarea.findUnique({ where: { id: entrada.plantillaId }, select: { activo: true } });
 
