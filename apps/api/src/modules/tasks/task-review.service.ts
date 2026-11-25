@@ -51,9 +51,34 @@ export class RevisionTareasService {
         requiereEvidencia: true,
         evidenciaRequerida: true,
         revisorId: true,
+        seguimientoEstricto: true,
+        porcentajeAvance: true,
+        items: { where: { completadoEn: null }, select: { id: true } },
       },
     });
     const accion = accionDeEnvio(tarea.estado);
+
+    if (accion !== null && tarea.seguimientoEstricto) {
+      const pendientes: { campo: string; mensaje: string }[] = [];
+
+      if (tarea.porcentajeAvance < 100) {
+        pendientes.push({ campo: 'porcentaje', mensaje: `El avance está en ${String(tarea.porcentajeAvance)} %; registre uno al 100 %.` });
+      }
+
+      if (tarea.items.length > 0) {
+        pendientes.push({
+          campo: 'items',
+          mensaje:
+            tarea.items.length === 1
+              ? 'Falta 1 paso de la lista de verificación.'
+              : `Faltan ${String(tarea.items.length)} pasos de la lista de verificación.`,
+        });
+      }
+
+      if (pendientes.length > 0) {
+        throw new BadRequestException({ mensaje: 'Todavía no se puede enviar a revisión.', errores: pendientes });
+      }
+    }
 
     if (accion === null) {
       throw new ConflictException({
