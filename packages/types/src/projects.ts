@@ -178,6 +178,7 @@ export const esquemaTareaProyecto = z.object({
   responsable: esquemaPersona,
   fechaInicio: z.iso.date().nullable(),
   fechaLimite: z.iso.date(),
+  horaLimite: z.string().nullable(),
   porcentajeAvance: z.number().int().min(0).max(100),
   atrasada: z.boolean(),
   etapaId: z.uuid(),
