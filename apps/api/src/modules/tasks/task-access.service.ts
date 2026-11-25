@@ -4,6 +4,7 @@ import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/auth
 import { PrismaService } from '../../prisma/prisma.service';
 import { PermisosEfectivosService } from '../access-control/effective-permissions.service';
 import { actorDesde, AuditoriaService, type ClienteBaseDatos } from '../audit/audit.service';
+import { filtroEquipoProyecto } from '../projects/project-visibility';
 
 export interface ParticipacionTarea {
   id: string;
@@ -37,6 +38,7 @@ export class AccesoTareasService {
     }
 
     const condiciones = filtroParticipacion(usuario.usuarioId);
+    condiciones.push({ etapa: { proyecto: filtroEquipoProyecto(usuario.usuarioId) } });
 
     if (usuario.alcance === 'ASIGNADO') {
       condiciones.push({ cliente: { asignaciones: { some: { usuarioId: usuario.usuarioId, retiradoEn: null } } } });
