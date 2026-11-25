@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { esquemaReferenciaCatalogo } from './catalogs';
 import { esquemaMetadatosPagina } from './common';
-import { esquemaEstadoTarea } from './task-states';
+import { esquemaEstadoTarea, esquemaHoraOpcional } from './task-states';
 import { esquemaSemaforo, esquemaSeguimientoTarea } from './task-tracking';
 import { esquemaListaSubidas } from './uploads';
 
@@ -65,7 +65,9 @@ const esquemaBaseTarea = z.object({
   revisorId: z.uuid().nullable(),
   prioridad: esquemaPrioridad,
   fechaInicio: fechaOpcional,
+  horaInicio: esquemaHoraOpcional,
   fechaLimite: z.iso.date('Ingrese la fecha límite.'),
+  horaLimite: esquemaHoraOpcional,
   requiereAprobacion: z.boolean(),
   requiereEvidencia: z.boolean(),
   evidenciaRequerida: textoOpcional(1000),
@@ -99,6 +101,23 @@ function validarReglasComunes(
       code: 'custom',
       path: ['fechaLimite'],
       message: 'La fecha límite no puede ser anterior a la de inicio.',
+    });
+  }
+
+  if (tarea.horaInicio !== null && tarea.fechaInicio === null) {
+    contexto.addIssue({ code: 'custom', path: ['horaInicio'], message: 'Elija también la fecha de inicio.' });
+  }
+
+  if (
+    tarea.fechaInicio === tarea.fechaLimite &&
+    tarea.horaInicio !== null &&
+    tarea.horaLimite !== null &&
+    tarea.horaInicio >= tarea.horaLimite
+  ) {
+    contexto.addIssue({
+      code: 'custom',
+      path: ['horaLimite'],
+      message: 'En el mismo día, la hora límite debe ser posterior a la de inicio.',
     });
   }
 
@@ -167,7 +186,9 @@ export const esquemaTareaResumen = z.object({
   estado: esquemaEstadoTarea,
   prioridad: esquemaPrioridad,
   fechaInicio: z.iso.date().nullable(),
+  horaInicio: z.string().nullable(),
   fechaLimite: z.iso.date(),
+  horaLimite: z.string().nullable(),
   cliente: esquemaReferenciaCatalogo.nullable(),
   responsable: esquemaPersona,
   porcentajeAvance: z.number().int().min(0).max(100),
