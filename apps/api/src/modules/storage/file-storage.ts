@@ -9,5 +9,7 @@ export interface ArchivoGuardado {
 export abstract class AlmacenArchivos {
   abstract guardar(contenido: Buffer, carpeta: string, extension: string): Promise<ArchivoGuardado>;
 
-  abstract leer(ruta: string): Readable;
+  abstract leer(ruta: string, rango?: { inicio: number; fin: number }): Readable;
+
+  abstract rutaAbsoluta(ruta: string): string;
 }
