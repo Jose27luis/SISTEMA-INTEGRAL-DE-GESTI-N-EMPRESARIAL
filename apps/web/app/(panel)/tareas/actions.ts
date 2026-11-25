@@ -47,6 +47,7 @@ function leerTarea(datos: FormData): Record<string, unknown> {
     requiereEvidencia: leerCasilla(datos, 'requiereEvidencia'),
     evidenciaRequerida: leerTexto(datos, 'evidenciaRequerida'),
     plantillaId: leerOpcional(datos, 'plantillaId'),
+    etapaId: leerOpcional(datos, 'etapaId'),
     items: leerTexto(datos, 'items')
       .split('\n')
       .map((linea) => linea.trim())
