@@ -121,6 +121,7 @@ export default async function PaginaTareas({ searchParams }: PropiedadesPaginaTa
       : Promise.resolve(null),
     solicitarApi('/tareas/opciones', { esquema: esquemaOpcionesTarea }),
   ]);
+  const asignadas = Number.parseInt(primerValor(crudos.asignadas), 10) || 0;
   const totalPaginas =
     tareas?.ok === true ? Math.max(1, Math.ceil(tareas.datos.total / tareas.datos.porPagina)) : 1;
 
@@ -145,6 +146,11 @@ export default async function PaginaTareas({ searchParams }: PropiedadesPaginaTa
         }
       />
       <div className="flex flex-col gap-6">
+        {asignadas > 1 ? (
+          <Alerta tono="exito" titulo={`Se asignaron ${String(asignadas)} tareas`}>
+            Cada responsable recibió su propia tarea y el aviso para confirmar la recepción.
+          </Alerta>
+        ) : null}
         <Tarjeta>
           <form method="get" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <input type="hidden" name="vista" value={vista} />
