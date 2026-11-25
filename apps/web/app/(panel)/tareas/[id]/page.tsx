@@ -178,6 +178,21 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
             ) : null}
           </Tarjeta>
 
+          {tarea.adjuntos.length === 0 ? null : (
+            <Tarjeta
+              titulo={`Archivos de la tarea (${String(tarea.adjuntos.length)})`}
+              descripcion={`Adjuntados por ${[...new Set(tarea.adjuntos.map(({ agregadoPor }) => agregadoPor))].join(', ')} al asignarla.`}
+            >
+              <ul className="grid gap-2 @container sm:grid-cols-2">
+                {tarea.adjuntos.map((adjunto) => (
+                  <li key={adjunto.id} className="min-w-0">
+                    <ArchivoAdjunto id={adjunto.id} nombre={adjunto.nombre} tamanoBytes={adjunto.tamanoBytes} />
+                  </li>
+                ))}
+              </ul>
+            </Tarjeta>
+          )}
+
           {tarea.items.length > 0 || tarea.acciones.registrarAvance || tarea.acciones.editar ? (
             <Tarjeta
               titulo="Lista de verificación"
