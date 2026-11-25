@@ -29,4 +29,11 @@ describe('semáforo', () => {
     expect(semaforoTarea('PENDIENTE', '2026-11-24', '2026-11-25')).toBe('VENCIDA');
     expect(semaforoTarea('FINALIZADA', '2026-11-24', '2026-11-25')).toBe('CERRADA');
   });
+
+  it('con hora límite vence el mismo día al pasar la hora', () => {
+    expect(semaforoTarea('EN_PROCESO', '2026-11-25', '2026-11-25', '12:00', '11:59')).toBe('POR_VENCER');
+    expect(semaforoTarea('EN_PROCESO', '2026-11-25', '2026-11-25', '12:00', '12:00')).toBe('POR_VENCER');
+    expect(semaforoTarea('EN_PROCESO', '2026-11-25', '2026-11-25', '12:00', '12:01')).toBe('VENCIDA');
+    expect(semaforoTarea('EN_PROCESO', '2026-11-25', '2026-11-25', null, '23:59')).toBe('POR_VENCER');
+  });
 });
