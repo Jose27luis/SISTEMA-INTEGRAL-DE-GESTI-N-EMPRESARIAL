@@ -101,6 +101,8 @@ model Usuario {
   entregablesEntregados   Entregable[]         @relation("EntregadorDeEntregable")
   entregablesRevisados    Entregable[]         @relation("RevisorDeEntregable")
   subidas                 Subida[]
+  prorrogasSolicitadas    ProrrogaTarea[]      @relation("SolicitanteDeProrroga")
+  prorrogasResueltas      ProrrogaTarea[]      @relation("ResolutorDeProrroga")
 
   @@map("usuarios")
 }
@@ -456,6 +458,11 @@ enum TipoNotificacion {
   PROYECTO_ASIGNADO
   ENTREGABLE_POR_REVISAR
   ENTREGABLE_REVISADO
+  TAREA_SIN_ACUSE
+  TAREA_SIN_REPORTE
+  TAREA_ESCALADA
+  PRORROGA_SOLICITADA
+  PRORROGA_RESUELTA
 }
 
 enum DecisionRevision {
@@ -493,6 +500,9 @@ model Tarea {
   reglaId            String?     @map("regla_id") @db.Uuid
   fechaOcurrencia    DateTime?   @map("fecha_ocurrencia") @db.Date
   etapaId            String?     @map("etapa_id") @db.Uuid
+  seguimientoEstricto Boolean    @default(false) @map("seguimiento_estricto")
+  recibidaEn         DateTime?   @map("recibida_en") @db.Timestamptz(3)
+  ultimoReporteEn    DateTime?   @map("ultimo_reporte_en") @db.Timestamptz(3)
   version            Int         @default(1)
   creadoEn           DateTime    @default(now()) @map("creado_en") @db.Timestamptz(3)
   actualizadoEn      DateTime    @updatedAt @map("actualizado_en") @db.Timestamptz(3)
@@ -511,6 +521,9 @@ model Tarea {
   regla         ReglaRecurrencia?  @relation(fields: [reglaId], references: [id])
   items         ItemVerificacion[]
   etapa         EtapaProyecto?     @relation(fields: [etapaId], references: [id])
+  prorrogas     ProrrogaTarea[]
+
+  @@index([seguimientoEstricto, estado], map: "tareas_seguimiento_idx")
 
   @@unique([reglaId, fechaOcurrencia])
   @@index([etapaId])
@@ -1413,4 +1426,31 @@ model VistaPrevia {
 
   @@index([estado, actualizadoEn])
   @@map("vistas_previas")
+}
+
+enum EstadoProrroga {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+model ProrrogaTarea {
+  id              String         @id @default(uuid()) @db.Uuid
+  tareaId         String         @map("tarea_id") @db.Uuid
+  fechaAnterior   DateTime       @map("fecha_anterior") @db.Date
+  fechaPropuesta  DateTime       @map("fecha_propuesta") @db.Date
+  motivo          String
+  estado          EstadoProrroga @default(PENDIENTE)
+  solicitadaPorId String         @map("solicitada_por_id") @db.Uuid
+  solicitadaEn    DateTime       @default(now()) @map("solicitada_en") @db.Timestamptz(3)
+  resueltaPorId   String?        @map("resuelta_por_id") @db.Uuid
+  resueltaEn      DateTime?      @map("resuelta_en") @db.Timestamptz(3)
+  respuesta       String?
+
+  tarea         Tarea    @relation(fields: [tareaId], references: [id])
+  solicitadaPor Usuario  @relation("SolicitanteDeProrroga", fields: [solicitadaPorId], references: [id])
+  resueltaPor   Usuario? @relation("ResolutorDeProrroga", fields: [resueltaPorId], references: [id])
+
+  @@index([tareaId, solicitadaEn])
+  @@map("prorrogas_tarea")
 }
