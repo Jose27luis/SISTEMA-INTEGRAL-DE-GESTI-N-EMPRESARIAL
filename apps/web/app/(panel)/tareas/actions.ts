@@ -8,6 +8,8 @@ import {
   esquemaEnvioEntrada,
   esquemaFinalizacionEntrada,
   esquemaItemEntrada,
+  esquemaProrrogaEntrada,
+  esquemaResolucionProrroga,
   esquemaRevisionEntrada,
   esquemaTareaDetalle,
   esquemaTareaEntrada,
@@ -392,4 +394,63 @@ export async function cancelarTarea(
   }
 
   return ejecutarTransicion(id, 'cancelacion', entrada.data, valores, 'Tarea cancelada.');
+}
+
+export async function acusarTarea(id: string): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success) {
+    return ERROR_TAREA;
+  }
+
+  return ejecutarTransicion(id, 'acuse', undefined, {}, 'Recepción confirmada.');
+}
+
+export async function solicitarProrroga(
+  id: string,
+  _anterior: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success) {
+    return ERROR_TAREA;
+  }
+
+  const valores = valoresDeFormulario(datos);
+  const entrada = esquemaProrrogaEntrada.safeParse({
+    fechaPropuesta: leerTexto(datos, 'fechaPropuesta'),
+    motivo: leerTexto(datos, 'motivo'),
+  });
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  return ejecutarTransicion(id, 'prorrogas', entrada.data, valores, 'Prórroga solicitada. Quien asignó la tarea recibió el aviso.');
+}
+
+export async function resolverProrroga(
+  id: string,
+  prorrogaId: string,
+  _anterior: EstadoFormulario,
+  datos: FormData,
+): Promise<EstadoFormulario> {
+  if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(prorrogaId).success) {
+    return ERROR_TAREA;
+  }
+
+  const valores = valoresDeFormulario(datos);
+  const entrada = esquemaResolucionProrroga.safeParse({
+    decision: leerTexto(datos, 'decision'),
+    respuesta: leerTexto(datos, 'respuesta'),
+  });
+
+  if (!entrada.success) {
+    return estadoDesdeProblemas(entrada.error.issues, valores);
+  }
+
+  return ejecutarTransicion(
+    id,
+    `prorrogas/${prorrogaId}/resolucion`,
+    entrada.data,
+    valores,
+    entrada.data.decision === 'APROBAR' ? 'Prórroga aprobada: la fecha límite cambió.' : 'Prórroga rechazada.',
+  );
 }
