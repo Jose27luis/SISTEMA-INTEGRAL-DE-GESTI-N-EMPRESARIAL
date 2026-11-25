@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Prioridad } from './tasks';
-import { ESTADOS_CERRADOS, type EstadoTarea } from './task-states';
+import { ESTADOS_CERRADOS, esquemaHoraOpcional, type EstadoTarea, vencioPlazo } from './task-states';
 
 export const HORAS_PARA_ACUSE = 24;
 
@@ -61,12 +61,18 @@ export function sumarDiasHabiles(desde: string, dias: number): string {
   return new Date(dia * MS_POR_DIA).toISOString().slice(0, 10);
 }
 
-export function semaforoTarea(estado: EstadoTarea, fechaLimite: string, hoy: string): Semaforo {
+export function semaforoTarea(
+  estado: EstadoTarea,
+  fechaLimite: string,
+  hoy: string,
+  horaLimite: string | null = null,
+  horaActual: string | null = null,
+): Semaforo {
   if (ESTADOS_CERRADOS.includes(estado)) {
     return 'CERRADA';
   }
 
-  if (fechaLimite < hoy) {
+  if (vencioPlazo(fechaLimite, hoy, horaLimite, horaActual)) {
     return 'VENCIDA';
   }
 
@@ -111,6 +117,7 @@ export const ETIQUETAS_ESTADO_PRORROGA: Record<EstadoProrroga, string> = {
 
 export const esquemaProrrogaEntrada = z.object({
   fechaPropuesta: z.iso.date('Elija la nueva fecha límite.'),
+  horaPropuesta: esquemaHoraOpcional,
   motivo: z.string().trim().min(10, 'Explique el motivo con al menos 10 caracteres.').max(1000),
 });
 export type ProrrogaEntrada = z.infer<typeof esquemaProrrogaEntrada>;
@@ -135,7 +142,9 @@ export type ResolucionProrroga = z.infer<typeof esquemaResolucionProrroga>;
 export const esquemaProrroga = z.object({
   id: z.uuid(),
   fechaAnterior: z.iso.date(),
+  horaAnterior: z.string().nullable(),
   fechaPropuesta: z.iso.date(),
+  horaPropuesta: z.string().nullable(),
   motivo: z.string(),
   estado: esquemaEstadoProrroga,
   solicitadaPor: z.string(),
