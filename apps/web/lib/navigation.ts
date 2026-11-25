@@ -18,6 +18,7 @@ export type IconoNavegacion =
   | 'plantillas'
   | 'reporte-clientes'
   | 'procesos'
+  | 'proyectos'
   | 'ingresos'
   | 'egresos'
   | 'reportes-financieros'
@@ -70,6 +71,7 @@ export const NAVEGACION: GrupoNavegacion[] = [
         icono: 'cronograma',
         permiso: 'obligacion:ver',
       },
+      { ruta: '/proyectos', etiqueta: 'Proyectos', icono: 'proyectos', permiso: 'proyecto:ver' },
       { ruta: '/documentos', etiqueta: 'Documentos', icono: 'documentos', permiso: 'documento:ver' },
       { ruta: '/clientes', etiqueta: 'Clientes', icono: 'clientes', permiso: 'cliente:ver' },
       { ruta: '/personal', etiqueta: 'Personal', icono: 'personal', permiso: 'personal:ver' },
