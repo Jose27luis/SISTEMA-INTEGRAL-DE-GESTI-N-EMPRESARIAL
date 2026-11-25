@@ -6,6 +6,7 @@ import { type ReactNode, useActionState, useState } from 'react';
 import { MensajeFormulario } from '@/components/form-message';
 import { BotonEnvio } from '@/components/submit-button';
 import { ESTADO_INICIAL, type EstadoFormulario } from '@/lib/form-state';
+import { formatearFecha } from '@/lib/format';
 
 interface PropiedadesFormularioTarea {
   accion: (anterior: EstadoFormulario, datos: FormData) => Promise<EstadoFormulario>;
@@ -141,15 +142,26 @@ export function FormularioTarea({
               defaultValue={valor('fechaInicio', tarea?.fechaInicio) ?? fechaHoy}
               error={estado.errores.fechaInicio}
             />
-            <Campo
-              id="fechaLimite"
-              name="fechaLimite"
-              type="date"
-              etiqueta="Fecha límite"
-              required
-              defaultValue={valor('fechaLimite', base?.fechaLimite)}
-              error={estado.errores.fechaLimite}
-            />
+            {tarea?.seguimiento.estricto === true ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-tinta">Fecha límite</span>
+                <input type="hidden" name="fechaLimite" value={tarea.fechaLimite} />
+                <span className="flex h-11 items-center rounded-md border border-borde bg-fondo px-3 text-sm text-tinta">
+                  {formatearFecha(tarea.fechaLimite)}
+                </span>
+                <span className="text-xs text-apagado">Solo cambia con una prórroga aprobada.</span>
+              </div>
+            ) : (
+              <Campo
+                id="fechaLimite"
+                name="fechaLimite"
+                type="date"
+                etiqueta="Fecha límite"
+                required
+                defaultValue={valor('fechaLimite', base?.fechaLimite)}
+                error={estado.errores.fechaLimite}
+              />
+            )}
           </div>
         </div>
       </fieldset>
