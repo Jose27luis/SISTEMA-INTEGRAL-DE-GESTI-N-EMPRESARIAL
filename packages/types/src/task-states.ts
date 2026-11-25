@@ -96,6 +96,31 @@ export function accionDeEnvio(actual: EstadoTarea): AccionTarea | null {
   return actual === 'CORREGIDA' ? 'REENVIAR' : null;
 }
 
-export function estaAtrasada(estado: EstadoTarea, fechaLimite: string, hoy: string): boolean {
-  return !ESTADOS_CERRADOS.includes(estado) && fechaLimite < hoy;
+export const PATRON_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export const esquemaHoraOpcional = z
+  .string()
+  .trim()
+  .transform((valor) => (valor === '' ? null : valor))
+  .pipe(z.string().regex(PATRON_HORA, 'Hora no válida.').nullable())
+  .nullable()
+  .default(null);
+
+export function vencioPlazo(
+  fechaLimite: string,
+  hoy: string,
+  horaLimite: string | null = null,
+  horaActual: string | null = null,
+): boolean {
+  return fechaLimite < hoy || (fechaLimite === hoy && horaLimite !== null && horaActual !== null && horaLimite < horaActual);
+}
+
+export function estaAtrasada(
+  estado: EstadoTarea,
+  fechaLimite: string,
+  hoy: string,
+  horaLimite: string | null = null,
+  horaActual: string | null = null,
+): boolean {
+  return !ESTADOS_CERRADOS.includes(estado) && vencioPlazo(fechaLimite, hoy, horaLimite, horaActual);
 }
