@@ -44,7 +44,9 @@ function leerTarea(datos: FormData): Record<string, unknown> {
     revisorId: leerOpcional(datos, 'revisorId'),
     prioridad: leerTexto(datos, 'prioridad'),
     fechaInicio: leerTexto(datos, 'fechaInicio'),
+    horaInicio: leerTexto(datos, 'horaInicio'),
     fechaLimite: leerTexto(datos, 'fechaLimite'),
+    horaLimite: leerTexto(datos, 'horaLimite'),
     requiereAprobacion: leerCasilla(datos, 'requiereAprobacion'),
     requiereEvidencia: leerCasilla(datos, 'requiereEvidencia'),
     evidenciaRequerida: leerTexto(datos, 'evidenciaRequerida'),
@@ -443,6 +445,7 @@ export async function solicitarProrroga(
   const valores = valoresDeFormulario(datos);
   const entrada = esquemaProrrogaEntrada.safeParse({
     fechaPropuesta: leerTexto(datos, 'fechaPropuesta'),
+    horaPropuesta: leerTexto(datos, 'horaPropuesta'),
     motivo: leerTexto(datos, 'motivo'),
   });
 
