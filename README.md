@@ -2784,7 +2784,7 @@ Terminado y publicado el 24/11/2026; detalle y pendientes en [12.11](#1211-sprin
 
 | Sprint | Alcance | Requerimientos |
 |---|---|---|
-| 10 | Proyectos, equipo, etapas, entregables, Gantt, kanban, avance calculado, proyectos con dificultades | RF-PRY-01 a 07, RF-GER-07 |
+| 10 ✅ | Proyectos, equipo, etapas, entregables, Gantt, kanban, avance calculado, proyectos con dificultades. Detalle en [12.16](#1216-sprint-10-proyectos). | RF-PRY-01 a 07, RF-GER-07 |
 | 11 | Aliados, oportunidades, embudo, actividades comerciales, cotizaciones, conversión a cliente, reporte gerencial consolidado | RF-COM-01 a 06, RF-REP-06 |
 
 ### 10.8 Fase 5: automatización e integraciones
@@ -3716,7 +3716,7 @@ El periodo de los indicadores no puede superar un año, y la fecha final no pued
 
 | Requerimiento | Situación |
 |---|---|
-| Buscar proyectos (RF-BUS-01) | Con el módulo de proyectos (Fase 4). |
+| Buscar proyectos (RF-BUS-01) | Hecho en el Sprint 10 ([12.16](#1216-sprint-10-proyectos)). |
 | Integración directa con la API de la bóveda | No se pidió; el registro guarda la referencia de la entrada (D-02). |
 | Editar o reordenar los pasos de una lista ya creada | Se pueden agregar y marcar; no se borran, para conservar el historial. |
 
@@ -3834,7 +3834,107 @@ El periodo de los indicadores no puede superar un año, y la fecha final no pued
 |---|---|
 | Doble aprobación de operaciones sensibles (RF-ROL-07, prioridad C) | Diferida: hoy las anulaciones están reservadas a Gerencia y siempre exigen motivo. |
 | Emitir comprobantes electrónicos | Fuera de alcance por D-07: se registra el comprobante emitido en el sistema de facturación actual. |
-| Egresos asignados a proyectos | Con el módulo de proyectos (Fase 4). |
+| Egresos asignados a proyectos | Hecho en el Sprint 10 ([12.16](#1216-sprint-10-proyectos)). |
+
+### 12.16 Sprint 10: proyectos
+
+**Modelo de datos** (migración `20261130120000_proyectos`):
+
+- **`proyectos`:**
+  - Contenido: código `P-AAAA-NNNN` (secuencia propia), nombre, cliente opcional (proyecto interno si no tiene), servicio, descripción, objetivo, responsable, presupuesto, honorarios, fechas de inicio y entrega, estado, dificultad con su detalle, resultado final, fecha de cierre y quién lo creó.
+  - Restricciones (CHECK): la entrega no puede ser anterior al inicio, los montos deben ser mayores a cero, finalizar o cancelar exige resultado y fecha de cierre, y marcar una dificultad exige detalle.
+- **`miembros_proyecto`:** integrantes con alta y retiro por fecha. Nada se borra, y un índice único parcial impide duplicar a un integrante vigente.
+- **`etapas_proyecto`:** nombre, orden (único por proyecto), inicio, fin (CHECK de orden) y estado (pendiente, en curso o completada).
+- **`entregables`:**
+  - Contenido: etapa, nombre, fecha de compromiso, estado (pendiente, por aprobar, observado o aprobado), archivo, quién entregó, quién revisó, cuándo y el comentario.
+  - Restricciones (CHECK): entregar exige el archivo, y observar exige el comentario.
+- **`tareas.etapa_id`:** las tareas de un proyecto pertenecen a una etapa (RF-PRY-02).
+- **`egresos.proyecto_id`:** el egreso suma al costo del proyecto.
+- **Notificaciones nuevas:** `PROYECTO_ASIGNADO`, `ENTREGABLE_POR_REVISAR` y `ENTREGABLE_REVISADO`.
+- **Permisos nuevos:**
+  - `proyecto:ver`: los cinco roles.
+  - `proyecto:crear`: Gerencia, Contabilidad y Administración.
+
+**Quién ve y quién gestiona:**
+
+- **Ven el proyecto:**
+  - Gerencia, por su alcance global.
+  - El responsable, quien lo creó y los integrantes.
+  - Con alcance «asignado», también quien tiene asignado su cliente (matriz «A»).
+- **Responsable o Gerencia:** editan los datos y el equipo, cambian el estado, definen etapas y entregables, y aprueban u observan los entregables.
+- **Equipo:** crea tareas en las etapas (si tiene `tarea:crear`), entrega archivos y reporta dificultades.
+- **Tareas del proyecto:** el equipo las ve aunque no participe directamente en ellas. Deben ser del mismo cliente que el proyecto, y su responsable debe pertenecer al equipo.
+
+**Endpoints de la API**
+
+| Método y ruta | Acceso | Descripción |
+|---|---|---|
+| `GET /proyectos`, `GET /proyectos/opciones`, `GET /proyectos/indicadores` | `proyecto:ver` | Lista con filtros (texto, cliente, responsable, estado, con dificultades), opciones de formulario e indicadores del tablero. |
+| `POST /proyectos` | `proyecto:crear` | Crear; el responsable y los integrantes deben estar asignados al cliente. |
+| `GET /proyectos/:id`, `PUT /proyectos/:id` | Ver: quien lo ve; editar: responsable o Gerencia | Detalle con etapas, tareas, entregables, egresos y permisos de la vista. |
+| `POST /proyectos/:id/estado` | Responsable o Gerencia | Planificado → En curso → En pausa ↔ En curso → Finalizado; Cancelado desde cualquier estado abierto. |
+| `POST /proyectos/:id/dificultad` | Equipo o Gerencia | Reportar o resolver una dificultad con detalle. |
+| `POST /proyectos/:id/etapas`, `PUT …/etapas/:etapaId`, `POST …/etapas/:etapaId/orden` | Responsable o Gerencia | Etapas (hasta 20) y su orden. |
+| `POST /proyectos/:id/etapas/:etapaId/entregables` | Responsable o Gerencia | Definir entregables. |
+| `POST /proyectos/:id/entregables/:entregableId/entrega` | Equipo o Gerencia | Multipart con el archivo (PDF, imagen u Office de hasta 24 MB, verificado por su contenido). |
+| `POST /proyectos/:id/entregables/:entregableId/revision` | Responsable o Gerencia | Aprobar u observar con comentario. |
+
+**Reglas implementadas**
+
+- **Avance (RF-PRY-06):** es el promedio del avance de las tareas no canceladas; las tareas aprobadas o finalizadas cuentan como 100 %. Se calcula igual por etapa y por proyecto.
+- **Finalizar:** exige que no queden tareas abiertas y que se describa el resultado final. Al cerrar el proyecto se limpia la dificultad. Un proyecto cerrado no admite cambios, tareas ni entregas.
+- **Cliente del proyecto:** no se puede cambiar si el proyecto ya tiene tareas.
+- **Entregables (RF-PRY-03):**
+  - Cada entrega reemplaza el archivo vigente y avisa al responsable. La revisión avisa a quien entregó.
+  - Un entregable observado se puede volver a entregar. Uno aprobado ya no se cambia.
+  - Los archivos los descarga quien puede ver el proyecto; cualquier otro intento queda auditado como permiso denegado.
+- **Dificultades (RF-PRY-07):** quedan marcadas en la lista y en el detalle del proyecto, y Gerencia las ve en su inicio junto con el avance y el responsable.
+- **Indicadores (RF-GER-07):** proyectos activos, finalizados en el año y atrasados (entrega vencida y proyecto abierto).
+- **Egresos:** al vincular un egreso a un proyecto de cliente, el egreso queda asignado a ese cliente, para la rentabilidad. Si se indica otro cliente, el sistema lo rechaza.
+- **Búsqueda (RF-BUS-01):** el buscador general encuentra proyectos por nombre (sin tildes) o código, respetando la visibilidad.
+
+**Pantallas web:**
+
+- **Proyectos:** lista con avance, estado, atraso y dificultad, y formulario de **Nuevo proyecto**.
+- **Detalle del proyecto**, con indicadores (avance, entrega, presupuesto frente a egresos, honorarios) y cuatro vistas:
+  - **Etapas y entregables:** tareas por etapa con «Nueva tarea», orden de etapas, entregas y revisión.
+  - **Cronograma (RF-PRY-04):** barras de etapas y tareas en el tiempo, con la línea de hoy y colores por estado.
+  - **Tablero de tareas (RF-PRY-05):** columnas Pendientes, En proceso, En revisión y Terminadas. El estado se cambia desde la tarea, con avances y revisión.
+  - **Datos del proyecto:** edición, cambio de estado y dificultades.
+- **Tareas:** la nueva tarea creada desde una etapa lleva el proyecto, el cliente y la etapa. El detalle de la tarea enlaza a su proyecto.
+- **Inicio:** proyectos activos, finalizados y atrasados, y la lista de proyectos con dificultades.
+- **Egresos:** selector de proyecto. **Búsqueda:** grupo Proyectos.
+
+**Verificación realizada:** typecheck, lint, 100 pruebas unitarias (5 nuevas de reglas de proyectos) y build. La migración se aplicó sobre las anteriores sin diferencias de esquema. Contra un stack desechable con PostgreSQL real se probaron:
+
+- **Permisos:**
+  - La asistente recibió 403 al crear proyectos, etapas, aprobar entregables y cambiar el estado.
+  - Administración, sin asignación ni pertenencia, recibió 403 en el proyecto y en sus tareas, y no lo encontró ni en la lista ni en la búsqueda.
+  - Comercial recibió 403 en el archivo del entregable.
+- **Validaciones:**
+  - Integrante no asignado al cliente y entrega anterior al inicio: 400.
+  - Tarea sin el cliente del proyecto o con un responsable fuera del equipo: 400.
+  - Archivo de texto como entregable: 400.
+- **Flujo completo:**
+  - La creación avisó a la asistente.
+  - Las etapas se reordenaron.
+  - Con tareas al 60 % y al 0 %, el avance fue 30 % en la etapa y en el proyecto.
+  - Entregable: observarlo sin texto dio 400; con texto quedó observado; aprobar un observado dio 409; se volvió a entregar y se aprobó, con los cuatro avisos.
+  - Finalizar desde Planificado y con tareas abiertas dio 409, y sin resultado 400. Con las tareas canceladas, el proyecto se finalizó y quedó cerrado a cambios (409).
+- **Dificultad:** la reportó la asistente y apareció en los indicadores de Gerencia.
+- **Egreso de S/ 1,250.50:** quedó asignado al cliente del proyecto y se mostró contra el presupuesto.
+- **Búsqueda:** «nandu» encontró el proyecto «Ñandú».
+- **Web:**
+  - Las 11 pantallas nuevas o modificadas se renderizaron.
+  - Editar una tarea del proyecto conservó su etapa.
+
+**Pendiente o diferido**
+
+| Requerimiento | Situación |
+|---|---|
+| Mover tarjetas del tablero arrastrándolas | El estado de una tarea depende de avances, evidencias y revisión, así que se cambia desde su detalle. |
+| Retirar etapas o entregables | No se borran; una etapa se marca como completada. |
+| Entregables vinculados al expediente documental | El archivo queda en el almacenamiento del cliente y se descarga desde el proyecto. Para el expediente, súbalo también en Documentos. |
 
 ---
 
