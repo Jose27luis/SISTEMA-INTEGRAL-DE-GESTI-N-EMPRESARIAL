@@ -15,6 +15,7 @@ import { HealthModule } from './modules/health/health.module';
 import { NotificacionesModule } from './modules/notifications/notifications.module';
 import { ObligacionesModule } from './modules/obligations/obligations.module';
 import { AccesosPlataformaModule } from './modules/platform-access/platform-access.module';
+import { ProyectosModule } from './modules/projects/projects.module';
 import { ReportesModule } from './modules/reports/reports.module';
 import { BusquedaModule } from './modules/search/search.module';
 import { PersonalModule } from './modules/staff/staff.module';
@@ -43,6 +44,7 @@ import { UsuariosModule } from './modules/users/users.module';
     OperacionClienteModule,
     BusquedaModule,
     FinanzasModule,
+    ProyectosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: GuardiaSesion },
