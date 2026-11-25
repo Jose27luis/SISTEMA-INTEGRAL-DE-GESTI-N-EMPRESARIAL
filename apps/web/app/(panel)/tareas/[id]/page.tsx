@@ -1,5 +1,6 @@
 import { ETIQUETAS_ESTADO_TAREA, esquemaTareaDetalle } from '@sige/types';
 import { Alerta, Insignia, Tarjeta } from '@sige/ui/components';
+import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -14,6 +15,7 @@ import { solicitarApi } from '@/lib/api';
 import { formatearFecha, formatearFechaHora, formatearMinutos } from '@/lib/format';
 import { obtenerPerfil, tienePermiso } from '@/lib/profile';
 import {
+  acusarTarea,
   agregarItem,
   cancelarTarea,
   comentarTarea,
@@ -22,13 +24,17 @@ import {
   iniciarTarea,
   marcarItem,
   registrarAvance,
+  resolverProrroga,
   revisarTarea,
+  solicitarProrroga,
 } from '../actions';
 import { ListaVerificacion } from './checklist';
 import { FormularioComentario } from './comment-form';
+import { BotonAcuse, FormularioProrroga, FormularioResolucionProrroga } from './extension-forms';
 import { FormularioAvance } from './progress-form';
 import { FormularioEnvio, FormularioRevision } from './review-forms';
 import { BotonIniciar } from './start-button';
+import { BarraSeguimiento } from './tracking-bar';
 
 export const metadata: Metadata = { title: 'Tarea · TORRES ASOCIADOS' };
 
@@ -60,6 +66,8 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
   }
 
   const tarea = resultado.datos;
+  const seguimiento = tarea.seguimiento;
+  const prorrogaPendiente = seguimiento.prorrogas.find(({ estado }) => estado === 'PENDIENTE') ?? null;
   const corregibles = tarea.avances.map((avance) => ({
     id: avance.id,
     etiqueta: `${formatearFechaHora(avance.registradoEn)} · ${avance.actividad}`,
@@ -90,8 +98,35 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
         }
       />
 
+      <section id="seguimiento" className="mb-6 scroll-mt-6">
+        <Tarjeta titulo="Seguimiento">
+          <BarraSeguimiento seguimiento={seguimiento} prioridad={tarea.prioridad} fechaLimite={tarea.fechaLimite} />
+        </Tarjeta>
+      </section>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
+          {seguimiento.acciones.acusar ? (
+            <Alerta tono={seguimiento.sinAcuse ? 'error' : 'info'} titulo="Confirme que recibió esta tarea">
+              <span className="mb-3 block">
+                {seguimiento.sinAcuse
+                  ? 'Pasaron más de 24 horas desde la asignación y quien la asignó ya recibió el aviso.'
+                  : 'Tiene 24 horas desde la asignación. Hasta confirmarla no podrá iniciarla ni registrar avances.'}
+              </span>
+              <BotonAcuse accion={acusarTarea.bind(null, tarea.id)} />
+            </Alerta>
+          ) : seguimiento.esperandoAcuse ? (
+            <Alerta tono={seguimiento.sinAcuse ? 'error' : 'aviso'} titulo="Esperando confirmación de recepción">
+              {tarea.responsable.nombre}{' '}
+              {seguimiento.sinAcuse ? 'no confirmó la tarea en 24 horas.' : 'todavía no confirma que la recibió.'}
+            </Alerta>
+          ) : null}
+          {seguimiento.sinReporte && seguimiento.limiteReporte !== null ? (
+            <Alerta tono="error" titulo="Sin reporte de avance">
+              El último avance debía renovarse hasta el {formatearFecha(seguimiento.limiteReporte)}.
+              {tarea.acciones.registrarAvance ? ' Registre un avance para ponerse al día.' : ''}
+            </Alerta>
+          ) : null}
           {tarea.etapa === null ? null : (
             <Alerta tono="info" titulo={`Proyecto ${tarea.etapa.proyecto.codigo}`}>
               Parte de la etapa «{tarea.etapa.nombre}» de{' '}
@@ -112,8 +147,10 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
           )}
           {tarea.atrasada ? (
             <Alerta tono="error" titulo="Tarea atrasada">
-              Venció el {formatearFecha(tarea.fechaLimite)}. Registre un avance o coordine una nueva fecha con quien la
-              asignó.
+              Venció el {formatearFecha(tarea.fechaLimite)}.{' '}
+              {seguimiento.estricto
+                ? 'Registre un avance o pida una prórroga a quien la asignó.'
+                : 'Registre un avance o coordine una nueva fecha con quien la asignó.'}
             </Alerta>
           ) : null}
 
@@ -170,6 +207,28 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
 
           {tarea.acciones.enviar ? (
             <Tarjeta titulo={tarea.estado === 'CORREGIDA' ? 'Reenviar a revisión' : 'Terminar tarea'}>
+              {seguimiento.requisitosEnvio.length === 0 ? null : (
+                <ul className="mb-4 flex flex-col gap-2 rounded-md bg-fondo px-4 py-3 text-sm">
+                  {seguimiento.requisitosEnvio.map((requisito) => (
+                    <li key={requisito.texto} className="flex items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className={
+                          requisito.cumplido
+                            ? 'grid size-5 place-items-center rounded-full bg-verde text-superficie'
+                            : 'size-5 rounded-full border-2 border-borde'
+                        }
+                      >
+                        {requisito.cumplido ? <Check className="size-3.5" strokeWidth={3} /> : null}
+                      </span>
+                      <span className={requisito.cumplido ? 'text-tinta' : 'font-medium text-rojo'}>
+                        <span className="sr-only">{requisito.cumplido ? 'Cumplido: ' : 'Falta: '}</span>
+                        {requisito.texto}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <FormularioEnvio
                 accion={enviarTarea.bind(null, tarea.id)}
                 requiereAprobacion={tarea.requiereAprobacion}
@@ -329,6 +388,57 @@ export default async function PaginaTarea({ params }: PropiedadesPaginaTarea): P
               <dd>{formatearFechaHora(tarea.creadoEn)}</dd>
             </dl>
           </Tarjeta>
+
+          {seguimiento.estricto && (seguimiento.prorrogas.length > 0 || seguimiento.acciones.solicitarProrroga) ? (
+            <Tarjeta titulo="Plazo" descripcion="La fecha límite solo cambia con una prórroga aprobada.">
+              <div className="flex flex-col gap-4">
+                {prorrogaPendiente === null ? null : (
+                  <div className="rounded-md border border-dorado bg-dorado-suave px-4 py-3 text-sm">
+                    <p className="font-semibold text-dorado-oscuro">
+                      Prórroga pendiente: {formatearFecha(prorrogaPendiente.fechaAnterior)} →{' '}
+                      {formatearFecha(prorrogaPendiente.fechaPropuesta)}
+                    </p>
+                    <p className="mt-1 whitespace-pre-line text-tinta">{prorrogaPendiente.motivo}</p>
+                    <p className="mt-1 text-xs text-apagado">
+                      {prorrogaPendiente.solicitadaPor} · {formatearFechaHora(prorrogaPendiente.solicitadaEn)}
+                    </p>
+                  </div>
+                )}
+                {prorrogaPendiente !== null && seguimiento.acciones.resolverProrroga ? (
+                  <FormularioResolucionProrroga accion={resolverProrroga.bind(null, tarea.id, prorrogaPendiente.id)} />
+                ) : null}
+                {seguimiento.acciones.solicitarProrroga ? (
+                  <FormularioProrroga accion={solicitarProrroga.bind(null, tarea.id)} fechaLimite={tarea.fechaLimite} />
+                ) : null}
+                {seguimiento.prorrogas.some(({ estado }) => estado !== 'PENDIENTE') ? (
+                  <ol className="flex flex-col gap-3 border-t border-borde pt-4 text-sm">
+                    {seguimiento.prorrogas
+                      .filter(({ estado }) => estado !== 'PENDIENTE')
+                      .map((prorroga) => (
+                        <li key={prorroga.id} className="flex flex-col gap-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <Insignia tono={prorroga.estado === 'APROBADA' ? 'exito' : 'peligro'}>
+                              {prorroga.estado === 'APROBADA' ? 'Aprobada' : 'Rechazada'}
+                            </Insignia>
+                            <span className="text-tinta">
+                              {formatearFecha(prorroga.fechaAnterior)} → {formatearFecha(prorroga.fechaPropuesta)}
+                            </span>
+                          </span>
+                          <span className="text-apagado">{prorroga.motivo}</span>
+                          <span className="text-xs text-apagado">
+                            Pedida por {prorroga.solicitadaPor} · resuelta por {prorroga.resueltaPor ?? '—'}{' '}
+                            {prorroga.resueltaEn === null ? '' : `el ${formatearFechaHora(prorroga.resueltaEn)}`}
+                          </span>
+                          {prorroga.respuesta === null ? null : (
+                            <span className="text-tinta">«{prorroga.respuesta}»</span>
+                          )}
+                        </li>
+                      ))}
+                  </ol>
+                ) : null}
+              </div>
+            </Tarjeta>
+          ) : null}
 
           {tarea.rondas.length === 0 ? null : (
             <Tarjeta titulo="Rondas de revisión">
