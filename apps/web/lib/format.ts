@@ -17,6 +17,10 @@ export function formatearFecha(fecha: string): string {
   return `${dia ?? ''}/${mes ?? ''}/${anio ?? ''}`;
 }
 
+export function formatearPlazo(fecha: string, hora: string | null): string {
+  return hora === null ? formatearFecha(fecha) : `${formatearFecha(fecha)} a las ${hora}`;
+}
+
 const FORMATO_FECHA_LIMA = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Lima',
   year: 'numeric',
