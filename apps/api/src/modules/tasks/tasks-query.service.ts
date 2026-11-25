@@ -270,6 +270,10 @@ export class ConsultaTareasService {
         plantilla: { select: { id: true, nombre: true } },
         etapa: { select: { id: true, nombre: true, proyecto: { select: { id: true, codigo: true, nombre: true } } } },
         items: { orderBy: { orden: 'asc' }, include: { completadoPor: { select: { nombre: true } } } },
+        adjuntos: {
+          orderBy: { agregadoEn: 'asc' },
+          include: { archivo: true, agregadoPor: { select: { nombre: true } } },
+        },
         prorrogas: {
           orderBy: { solicitadaEn: 'desc' },
           include: { solicitadaPor: { select: { nombre: true } }, resueltaPor: { select: { nombre: true } } },
@@ -331,6 +335,14 @@ export class ConsultaTareasService {
       creadoEn: aIso(tarea.creadoEn),
       obligacionId: tarea.obligacion?.id ?? null,
       plantilla: tarea.plantilla,
+      adjuntos: tarea.adjuntos.map(({ archivo, agregadoPor, agregadoEn }) => ({
+        id: archivo.id,
+        nombre: archivo.nombreOriginal,
+        mime: archivo.mime,
+        tamanoBytes: archivo.tamanoBytes,
+        agregadoPor: agregadoPor.nombre,
+        agregadoEn: aIso(agregadoEn),
+      })),
       etapa: tarea.etapa,
       items: tarea.items.map((item) => ({
         id: item.id,
