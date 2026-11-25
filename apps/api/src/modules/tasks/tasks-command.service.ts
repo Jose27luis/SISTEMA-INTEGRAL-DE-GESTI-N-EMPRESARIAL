@@ -29,8 +29,10 @@ function datosTarea(entrada: TareaEntrada): {
   requiereAprobacion: boolean;
   requiereEvidencia: boolean;
   evidenciaRequerida: string | null;
+  etapaId: string | null;
 } {
   return {
+    etapaId: entrada.etapaId,
     titulo: entrada.titulo,
     instrucciones: entrada.instrucciones,
     clienteId: entrada.clienteId,
@@ -325,6 +327,47 @@ export class GestionTareasService {
     return destino;
   }
 
+  private async validarEtapa(entrada: TareaEntrada, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
+    const etapa = await db.etapaProyecto.findUnique({
+      where: { id: entrada.etapaId ?? '' },
+      select: {
+        proyecto: {
+          select: {
+            estado: true,
+            clienteId: true,
+            responsableId: true,
+            miembros: { where: { retiradoEn: null }, select: { usuarioId: true } },
+          },
+        },
+      },
+    });
+    const error = (campo: string, mensaje: string): BadRequestException =>
+      new BadRequestException({ mensaje: 'Revise los datos ingresados.', errores: [{ campo, mensaje }] });
+
+    if (etapa === null) {
+      throw error('etapaId', 'La etapa no existe.');
+    }
+
+    const { proyecto } = etapa;
+    const equipo = new Set([proyecto.responsableId, ...proyecto.miembros.map(({ usuarioId }) => usuarioId)]);
+
+    if (proyecto.estado === 'FINALIZADO' || proyecto.estado === 'CANCELADO') {
+      throw error('etapaId', 'El proyecto está cerrado y no admite tareas.');
+    }
+
+    if (!usuario.alcanceGlobal && !equipo.has(usuario.usuarioId)) {
+      throw new ForbiddenException({ mensaje: 'Solo el equipo del proyecto puede crear o editar sus tareas.', errores: [] });
+    }
+
+    if (entrada.clienteId !== proyecto.clienteId) {
+      throw error('clienteId', 'La tarea debe ser del mismo cliente que el proyecto.');
+    }
+
+    if (!equipo.has(entrada.responsableId)) {
+      throw error('responsableId', 'El responsable debe pertenecer al equipo del proyecto.');
+    }
+  }
+
   private async validar(entrada: TareaEntrada, usuario: UsuarioAutenticado, db: ClienteBaseDatos): Promise<void> {
     if (entrada.plantillaId !== null) {
       const plantilla = await db.plantillaTarea.findUnique({ where: { id: entrada.plantillaId }, select: { activo: true } });
@@ -335,6 +378,10 @@ export class GestionTareasService {
           errores: [{ campo: 'plantillaId', mensaje: 'La plantilla no existe o está desactivada.' }],
         });
       }
+    }
+
+    if (entrada.etapaId !== null) {
+      await this.validarEtapa(entrada, usuario, db);
     }
 
     if (entrada.clienteId !== null) {
