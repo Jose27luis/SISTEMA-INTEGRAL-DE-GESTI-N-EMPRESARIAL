@@ -1,11 +1,14 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import {
   type AccionTarea,
+  type AsignacionMasiva,
   type EdicionTarea,
   type EstadoTarea,
   ESTADOS_CERRADOS,
   estadoTrasAccion,
   ETIQUETAS_PRIORIDAD,
+  type ResultadoAsignacionMasiva,
   type TareaEntrada,
 } from '@sige/types';
 import type { ContextoCliente, UsuarioAutenticado } from '../../common/auth/authenticated-request';
@@ -60,57 +63,130 @@ export class GestionTareasService {
   async crear(entrada: TareaEntrada, usuario: UsuarioAutenticado, contexto: ContextoCliente): Promise<string> {
     await this.validar(entrada, usuario, this.prisma);
 
+    const creada = await this.prisma.$transaction((tx) => this.crearEn(tx, entrada, usuario, contexto));
+
+    await this.notificaciones.publicar(creada.notificados);
+    return creada.id;
+  }
+
+  async crearLote(
+    entrada: AsignacionMasiva,
+    usuario: UsuarioAutenticado,
+    contexto: ContextoCliente,
+  ): Promise<ResultadoAsignacionMasiva> {
+    const { responsableIds, ...base } = entrada;
+    const entradas: TareaEntrada[] = responsableIds.map((responsableId) => ({
+      ...base,
+      responsableId,
+      colaboradorIds: base.colaboradorIds.filter((id) => !responsableIds.includes(id)),
+    }));
+
+    for (const individual of entradas) {
+      await this.validar(individual, usuario, this.prisma);
+    }
+
+    const creadas = await this.prisma.$transaction(
+      async (tx) => {
+        const resultado: { id: string; codigo: string; notificados: string[] }[] = [];
+
+        for (const individual of entradas) {
+          resultado.push(await this.crearEn(tx, individual, usuario, contexto));
+        }
+
+        return resultado;
+      },
+      { timeout: 60_000 },
+    );
+
+    await this.notificaciones.publicar(creadas.flatMap(({ notificados }) => notificados));
+
+    const nombres = new Map(
+      (
+        await this.prisma.usuario.findMany({ where: { id: { in: responsableIds } }, select: { id: true, nombre: true } })
+      ).map(({ id, nombre }) => [id, nombre]),
+    );
+
+    return {
+      tareas: creadas.map(({ id, codigo }, indice) => ({
+        id,
+        codigo,
+        responsable: nombres.get(responsableIds[indice] ?? '') ?? '',
+      })),
+    };
+  }
+
+  private async crearEn(
+    tx: Prisma.TransactionClient,
+    entrada: TareaEntrada,
+    usuario: UsuarioAutenticado,
+    contexto: ContextoCliente,
+  ): Promise<{ id: string; codigo: string; notificados: string[] }> {
     const colaboradorIds = [...new Set(entrada.colaboradorIds)].filter((id) => id !== entrada.responsableId);
     const notificados: string[] = [];
+    const codigo = await generarCodigoTarea(tx);
+    const tarea = await tx.tarea.create({
+      data: {
+        ...datosTarea(entrada),
+        codigo,
+        asignadoPorId: usuario.usuarioId,
+        plantillaId: entrada.plantillaId,
+        seguimientoEstricto: true,
+      },
+    });
 
-    const tareaId = await this.prisma.$transaction(async (tx) => {
-      const codigo = await generarCodigoTarea(tx);
-      const tarea = await tx.tarea.create({
-        data: {
-          ...datosTarea(entrada),
-          codigo,
-          asignadoPorId: usuario.usuarioId,
-          plantillaId: entrada.plantillaId,
-          seguimientoEstricto: true,
-        },
+    if (entrada.items.length > 0) {
+      await tx.itemVerificacion.createMany({
+        data: entrada.items.map((texto, orden) => ({ tareaId: tarea.id, texto, orden })),
       });
+    }
 
-      if (entrada.items.length > 0) {
-        await tx.itemVerificacion.createMany({
-          data: entrada.items.map((texto, orden) => ({ tareaId: tarea.id, texto, orden })),
-        });
-      }
-
-      if (colaboradorIds.length > 0) {
-        await tx.tareaColaborador.createMany({
-          data: colaboradorIds.map((usuarioId) => ({ tareaId: tarea.id, usuarioId })),
-        });
-      }
-
-      await tx.transicionTarea.create({
-        data: { tareaId: tarea.id, hacia: 'PENDIENTE', usuarioId: usuario.usuarioId, comentario: 'Tarea asignada' },
+    if (colaboradorIds.length > 0) {
+      await tx.tareaColaborador.createMany({
+        data: colaboradorIds.map((usuarioId) => ({ tareaId: tarea.id, usuarioId })),
       });
+    }
 
-      await this.auditoria.registrar(
+    await tx.transicionTarea.create({
+      data: { tareaId: tarea.id, hacia: 'PENDIENTE', usuarioId: usuario.usuarioId, comentario: 'Tarea asignada' },
+    });
+
+    await this.auditoria.registrar(
+      {
+        actor: actorDesde(usuario, contexto),
+        accion: 'CREAR',
+        entidad: 'tarea',
+        entidadId: tarea.id,
+        despues: { codigo, ...entrada, colaboradorIds },
+      },
+      tx,
+    );
+
+    const enlace = `/tareas/${tarea.id}`;
+    const mensaje = `${codigo} · Prioridad ${ETIQUETAS_PRIORIDAD[entrada.prioridad].toLowerCase()} · Vence el ${formatearFechaPeruana(entrada.fechaLimite)}`;
+
+    notificados.push(
+      ...(await this.notificaciones.crear(
         {
-          actor: actorDesde(usuario, contexto),
-          accion: 'CREAR',
+          destinatarios: [entrada.responsableId, ...colaboradorIds],
+          tipo: 'TAREA_ASIGNADA',
+          titulo: `Nueva tarea: ${entrada.titulo}`,
+          mensaje,
+          enlace,
           entidad: 'tarea',
           entidadId: tarea.id,
-          despues: { codigo, ...entrada, colaboradorIds },
         },
+        usuario.usuarioId,
         tx,
-      );
+      )),
+    );
 
-      const enlace = `/tareas/${tarea.id}`;
-      const mensaje = `${codigo} · Prioridad ${ETIQUETAS_PRIORIDAD[entrada.prioridad].toLowerCase()} · Vence el ${formatearFechaPeruana(entrada.fechaLimite)}`;
-
+    if (entrada.revisorId !== null) {
       notificados.push(
         ...(await this.notificaciones.crear(
           {
-            destinatarios: [entrada.responsableId, ...colaboradorIds],
+            destinatarios: [entrada.revisorId],
             tipo: 'TAREA_ASIGNADA',
-            titulo: `Nueva tarea: ${entrada.titulo}`,
+            titulo: `Revisará la tarea: ${entrada.titulo}`,
             mensaje,
             enlace,
             entidad: 'tarea',
@@ -120,30 +196,9 @@ export class GestionTareasService {
           tx,
         )),
       );
+    }
 
-      if (entrada.revisorId !== null) {
-        notificados.push(
-          ...(await this.notificaciones.crear(
-            {
-              destinatarios: [entrada.revisorId],
-              tipo: 'TAREA_ASIGNADA',
-              titulo: `Revisará la tarea: ${entrada.titulo}`,
-              mensaje,
-              enlace,
-              entidad: 'tarea',
-              entidadId: tarea.id,
-            },
-            usuario.usuarioId,
-            tx,
-          )),
-        );
-      }
-
-      return tarea.id;
-    });
-
-    await this.notificaciones.publicar(notificados);
-    return tareaId;
+    return { id: tarea.id, codigo, notificados };
   }
 
   async editar(
