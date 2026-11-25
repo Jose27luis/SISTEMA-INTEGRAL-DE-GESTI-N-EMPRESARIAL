@@ -48,7 +48,17 @@ function SeleccionCatalogo({
   error: string | undefined;
 }): ReactNode {
   return (
-    <Seleccion id={id} name={id} etiqueta={etiqueta} required defaultValue={valor ?? ''} error={error}>
+    <Seleccion
+      id={id}
+      name={id}
+      etiqueta={etiqueta}
+      required
+      defaultValue={valor ?? ''}
+      error={error}
+      {...(opciones.length === 0
+        ? { ayuda: 'No hay opciones registradas. Créelas en Administración → Catálogos.' }
+        : {})}
+    >
       <option value="" disabled>
         Seleccione
       </option>
