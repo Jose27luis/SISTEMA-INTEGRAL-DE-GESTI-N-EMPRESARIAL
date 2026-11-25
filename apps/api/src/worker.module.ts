@@ -13,6 +13,7 @@ import { GeneracionObligacionesJob } from './modules/scheduler/obligation-genera
 import { PagosVencidosJob } from './modules/scheduler/overdue-payments.job';
 import { TareasRecurrentesJob } from './modules/scheduler/recurring-tasks.job';
 import { AlertasTareasJob } from './modules/scheduler/task-alerts.job';
+import { SeguimientoTareasJob } from './modules/scheduler/task-tracking.job';
 import { PlantillasNucleoModule } from './modules/templates/templates-core.module';
 import { SubidasNucleoModule } from './modules/uploads/uploads-core.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -38,6 +39,7 @@ import { PrismaModule } from './prisma/prisma.module';
     HonorariosMensualesJob,
     PagosVencidosJob,
     MantenimientoArchivosJob,
+    SeguimientoTareasJob,
   ],
 })
 export class TrabajadorModule {}
